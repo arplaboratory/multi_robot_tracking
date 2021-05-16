@@ -1,0 +1,10 @@
+<library path="lib/libmulti_robot_tracking">
+  <class name="multi_robot_tracking/multi_robot_tracking_Nodelet" type="multi_robot_tracking_Nodelet" base_class_type="nodelet::Nodelet">
+    <description>
+      multi_robot_tracking
+    </description>
+  </class>
+
+
+</library>
+

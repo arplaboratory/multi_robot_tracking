@@ -1,0 +1,22 @@
+<launch>
+
+  <arg name="filter" default="jpdaf" />
+
+  <arg name="start_nodelet_manager" default="true" />
+  <arg name="nodelet_manager_name" default="nodelet_manager_multi_tracking" />
+  <param name="filter" value="$(arg filter)" />
+
+  <!-- Related Nodelets-->
+  <node pkg="nodelet" type="nodelet" name="$(arg nodelet_manager_name)" args="manager" output="screen" if="$(arg start_nodelet_manager)" />
+  <node pkg="nodelet"
+    type="nodelet"
+    args="load multi_robot_tracking/multi_robot_tracking_Nodelet $(arg nodelet_manager_name)"
+    name="multi_tracking"
+    required="true"
+    output="screen">
+    <param name="filter" value="$(arg filter)"/>
+  </node>
+  <!-- RVIZ -->
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find multi_robot_tracking)/rviz/darknet_vis.rviz" />
+
+</launch>

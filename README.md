@@ -16,6 +16,7 @@ Maintainer: Mark Lee, ml7617@nyu.edu<br />**
 
 
 ## Install
+The tracking filter package is dependent on Eigen and Boost, and ROS. The additional repo can be installed below:
 
 install darknet ros for 2d bounding box test (older version to be compatiable with rosbag data)
 ```

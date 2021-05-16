@@ -1,25 +1,18 @@
-#include </home/marklee/catkin_ws/src/phd_filter/include/phd_tracker/phd_tracker.h>
+#include <ros/console.h>
+#include <tf/transform_datatypes.h>
+#include "multi_robot_tracking/PhdFilter.h"
+
 
 using namespace std;
 
-#define NUM_DRONES 3
+PhdFilter::PhdFilter()
 
-namespace phd_tracker {
-	
-
-Node::Node(ros::NodeHandle nh, ros::NodeHandle nh_priv):
-    nh_(nh),
-    nh_priv_(nh_priv),
-    it_(nh_priv)
 {
+  initialize_matrix();
+}
 
-  real_detection_sub_ = nh_priv_.subscribe("/darknet_ros/bounding_boxes", 10, &Node::real_detectionCallback, this);
-
-  detection_sub_ = nh_priv_.subscribe("/hummingbird1/track/bounding_box", 10, &Node::detection_Callback, this);
-  image_sub_ = nh_priv_.subscribe("/hummingbird1/camera/rgb", 10, &Node::imageCallback, this);
-
-  image_pub_ = it_.advertise("tracked_image",1);
-
+void PhdFilter::initialize_matrix()
+{
 
   //initialize
   mk_minus_1 = Eigen::MatrixXf(4,NUM_DRONES);
@@ -54,178 +47,10 @@ Node::Node(ros::NodeHandle nh, ros::NodeHandle nh_priv):
   X_k = Eigen::MatrixXf::Zero(4,NUM_DRONES);
 
   mk_k_minus_1_beforePrediction = Eigen::MatrixXf(4,NUM_DRONES);
-
-
-
-
-
 }
 
-/*2d image callback
-save image*/
-void Node::imageCallback(const sensor_msgs::ImageConstPtr &img_msg)
+void PhdFilter::phd_track()
 {
-  ROS_INFO("image cb");
-  cv_bridge::CvImageConstPtr im_ptr_ = cv_bridge::toCvShare(img_msg, "rgb8");
-  input_image = im_ptr_->image;
-//  image_msg->header.stamp = img_msg->header.stamp;
-}
-
-/*2d detection callback
-store value and track*/
-void Node::detection_Callback(const geometry_msgs::PoseArray& in_PoseArray)
-{
-  ROS_INFO("detected size: %lu ", in_PoseArray.poses.size() );
-  //store Z
-  Z_current_k = in_PoseArray;
-  detected_size_k = in_PoseArray.poses.size();
-
-  Z_k = Eigen::MatrixXf::Zero(4,detected_size_k);
-
-
-  for(int i =0; i < detected_size_k; i++)
-  {
-    Z_k(0,i) = in_PoseArray.poses[i].position.x;
-    Z_k(1,i) = in_PoseArray.poses[i].position.y;
-  }
-
-  cout << "Z_k: " << endl << Z_k << endl;
-
-
-  if(first_callback)
-  {
-    initialize();
-    first_callback = false;
-  }
-
-  else {
-    phd_track();
-  }
-
-}
-
-/*2d detection callback
-store value and track*/
-void Node::real_detectionCallback(const darknet_ros_msgs::BoundingBoxesPtr& in_PoseArray)
-{
-  detected_size_k = in_PoseArray->bounding_boxes.size();
-    ROS_INFO("detected size: %d ", detected_size_k );
-
-  Z_k = Eigen::MatrixXf(4,detected_size_k);
-
-
-
-  for(int i =0; i < detected_size_k; i++)
-  {
-    Z_k(0,i) = int((in_PoseArray->bounding_boxes[i].xmin+in_PoseArray->bounding_boxes[i].xmax)/2);
-    Z_k(1,i) = int((in_PoseArray->bounding_boxes[i].ymin+in_PoseArray->bounding_boxes[i].ymax)/2);
-  }
-
-
-  if(first_callback)
-  {
-    for (int i = 0; i < detected_size_k; i++ )
-    {
-      geometry_msgs::Pose pose;
-      pose.position.x =  Z_k(0,i);
-      pose.position.y =  Z_k(1,i);
-      Z_current_k.poses.push_back(pose);
-    }
-
-    initialize();
-    first_callback = false;
-  }
-
-  else {
-    phd_track();
-  }
-
-}
-
-/*store 1st measurement Z */
-void Node::initialize()
-{
-
-  Eigen::MatrixXf P_k_init;
-  P_k_init = Eigen::MatrixXf(4,4);
-  P_k_init <<
-      10,0,0,0,
-      0,10,0,0,
-      0,0,5,0,
-      0,0,0,5;
-
-  for(int i = 0; i < mk_minus_1.cols(); i ++)
-  {
-    //store Z into mk (x,y)
-    mk_minus_1(0,i) = Z_current_k.poses[i].position.x;
-    mk_minus_1(1,i) = Z_current_k.poses[i].position.y;
-    mk_minus_1(2,i) = 0;
-    mk_minus_1(3,i) = 0;
-
-    //store pre-determined weight into wk (from matlab)
-    wk_minus_1(i) = .0016;
-
-    //store pre-determined weight into Pk (from paper)
-    Pk_minus_1.block<4,4>(0,i*4) = P_k_init;
-  }
-
-
-
-  F << 1,0,1,0,
-      0,1,0,1,
-      0,0,1,0,
-      0,0,0,1;
-
-  int dt =1;
-  int sigma_v = 5;
-  //Q = sigma_v^2 * [ [1/4*dt^4*I2, 1/2*dt^3*I2]; [1/2*dt^3* I2, dt^2*I2] ]; %Process noise covariance, given in Vo&Ma.
-
-  Q << 6.25, 0, 12.5, 0,
-      0, 6.25, 0, 12.5,
-      12.5, 0, 25, 0,
-      0, 12.5, 0, 25;
-
-  R << 100,0,0,0,
-      0,100,0,0,
-      0,0,100,0,
-      0,0,0,100;
-
-  numTargets_Jk_minus_1 = NUM_DRONES;
-
-
-
-}
-
-float Node::clutter_intensity(const float ZmeasureX, const float ZmeasureY)
-{
-  float xMin = 0;
-  float xMax = 360;
-  float yMin = 0;
-  float yMax = 240;
-  float uniform_dist = 0;
-  float clutter_intensity = 0;
-  float lambda = 12.5*pow(10,-6);
-  float volume = 4*pow(10,6);
-
-  if(ZmeasureX < xMin) return 0;
-  else if (ZmeasureX > xMax) return 0;
-  else if (ZmeasureY < yMin) return 0;
-  else if (ZmeasureY > yMax) return 0;
-  else
-  {
-    uniform_dist = 1 / ( (xMax - xMin)*(yMax - yMin) );
-
-  }
-
-  clutter_intensity = lambda * volume * uniform_dist;
-
-  return clutter_intensity;
-}
-
-/*phd filter */
-void Node::phd_track()
-{
-
   startTime = ros::Time::now();
 
   //predict existing
@@ -240,15 +65,14 @@ void Node::phd_track()
   phd_state_extract();
 
   //draw track on image
-  draw_image();
+  //draw_image();
 
   endTime = ros::Time::now();
   ROS_WARN("total plan time: %f [sec]", (endTime - startTime).toSec());
 
-
 }
 
-void Node::phd_predict_existing()
+void PhdFilter::phd_predict_existing()
 {
   ROS_INFO("======= 1. predict ======= \n");
   mk_k_minus_1_beforePrediction = mk_minus_1;
@@ -256,7 +80,7 @@ void Node::phd_predict_existing()
   wk_minus_1 = prob_survival * wk_minus_1;
   mk_minus_1 = F * mk_minus_1;
 
-//  cout << "P: " << endl << Pk_minus_1 << endl;
+  //  cout << "P: " << endl << Pk_minus_1 << endl;
 
   Eigen::MatrixXf P_temp;
   P_temp = Eigen::MatrixXf(4,4);
@@ -268,20 +92,19 @@ void Node::phd_predict_existing()
     Pk_minus_1.block<4,4>(0,4*j) = P_temp;
   }
 
-//   cout << "P: " << endl << Pk_minus_1 << endl;
-//   cout << "mk-1: " << endl << setprecision(3) << mk_minus_1 << endl;
-//   cout << "wk-1: " << endl << setprecision(3) << wk_minus_1 << endl;
+  //   cout << "P: " << endl << Pk_minus_1 << endl;
+  //   cout << "mk-1: " << endl << setprecision(3) << mk_minus_1 << endl;
+  //   cout << "wk-1: " << endl << setprecision(3) << wk_minus_1 << endl;
 
 
   wk_k_minus_1 = wk_minus_1;
   mk_k_minus_1 = mk_minus_1;
   Pk_k_minus_1 = Pk_minus_1;
   numTargets_Jk_k_minus_1 = numTargets_Jk_minus_1;
-//  ROS_INFO("size track: %d", numTargets_Jk_k_minus_1);
-
+  //  ROS_INFO("size track: %d", numTargets_Jk_k_minus_1);
 }
 
-void Node::phd_construct()
+void PhdFilter::phd_construct()
 {
   ROS_INFO("======= 2. construct ======= \n");
 
@@ -304,20 +127,20 @@ void Node::phd_construct()
     K.block<4,4>(0,4*j) = w1 * SCholInv.transpose();
     S.block<4,4>(0,4*j) = S_j;
 
-//    cout << "SChol: " << endl << SChol << endl;
-//    cout << "SCholInv: " << endl << SCholInv << endl;
+    //    cout << "SChol: " << endl << SChol << endl;
+    //    cout << "SCholInv: " << endl << SCholInv << endl;
 
     P_k_k.block<4,4>(0,4*j) = Pk_k_minus_1.block<4,4>(0,4*j) - w1*w1.transpose();
 
   }
 
-//  cout << "P_k_k: " << endl << P_k_k << endl;
-//    cout << "K: " << endl << K << endl;
+  //  cout << "P_k_k: " << endl << P_k_k << endl;
+  //    cout << "K: " << endl << K << endl;
 
 
 }
 
-void Node::phd_update()
+void PhdFilter::phd_update()
 {
   ROS_INFO("======= 3. update ======= \n");
 
@@ -417,11 +240,11 @@ void Node::phd_update()
 
   cout << "wk: " << endl << setprecision(3) << wk << endl;
   cout << "mk: " << endl << setprecision(3) << mk << endl;
-//  cout << "Pk: " << endl << setprecision(3) << Pk << endl;
+  //  cout << "Pk: " << endl << setprecision(3) << Pk << endl;
 
 }
 
-void Node::phd_prune()
+void PhdFilter::phd_prune()
 {
   ROS_INFO("======= 4. prune ======= \n");
 
@@ -440,7 +263,7 @@ void Node::phd_prune()
   P_val = Eigen::MatrixXf(4,4);
   P_bar_sum = Eigen::MatrixXf::Zero(4,4);
 
-//  cout << "wk: "  << wk << endl;
+  //  cout << "wk: "  << wk << endl;
   //find weights threshold
   for(int i = 0; i < wk.cols(); i ++)
   {
@@ -463,7 +286,7 @@ void Node::phd_prune()
 
     float max = I_weights.maxCoeff(&maxRow, &maxCol);
     j = int(I(maxCol));
-//    cout << "Max w: " << max <<  ", at I_index: " << maxCol << ", w_index: " << j << endl;
+    //    cout << "Max w: " << max <<  ", at I_index: " << maxCol << ", w_index: " << j << endl;
 
     //store index
     indexOrder(i) = j;
@@ -487,51 +310,51 @@ void Node::phd_prune()
       }
     }
 
-//    cout << "I: "  << I << endl;
+    //    cout << "I: "  << I << endl;
   }
-    cout << "indexOrder: "  << indexOrder << endl;
+  cout << "indexOrder: "  << indexOrder << endl;
 
-    //=============== rearrange index ===============
-    if (indexOrder.cols() > 0)
+  //=============== rearrange index ===============
+  if (indexOrder.cols() > 0)
+  {
+
+    Eigen::MatrixXd newIndex;
+    newIndex = Eigen::MatrixXd(1,indexOrder.cols());
+
+    //bring down index to numdrone range
+    for(int i = 0; i <indexOrder.cols(); i++  )
     {
-
-      Eigen::MatrixXd newIndex;
-      newIndex = Eigen::MatrixXd(1,indexOrder.cols());
-
-      //bring down index to numdrone range
-      for(int i = 0; i <indexOrder.cols(); i++  )
+      newIndex(i) = int(indexOrder(i))%numTargets_Jk_k_minus_1;
+      if(newIndex(i) == 0)
       {
-        newIndex(i) = int(indexOrder(i))%numTargets_Jk_k_minus_1;
-        if(newIndex(i) == 0)
-        {
-          newIndex(i) = 0; //unncessary bc index starts at 0
-        }
-      }
-
-      for(int i = 0; i <indexOrder.cols(); i++  )
-      {
-        if(newIndex(i) >  NUM_DRONES)
-        {
-          newIndex(i) = int(newIndex(i))%NUM_DRONES;
-        }
-      }
-
-      cout << "newIndex: "  << newIndex << endl;
-
-      int sortedIndex = 0;
-      //sort highest weight to correct association
-      for(int i = 0; i <indexOrder.cols(); i++  )
-      {
-        sortedIndex = newIndex(i);
-        wk_bar_fixed(sortedIndex) = wk_bar(i);
-        mk_bar_fixed.block<4,1>(0,sortedIndex) = mk_bar.block<4,1>(0,i);
-        Pk_bar_fixed.block<4,4>(0,4*sortedIndex) = Pk_bar.block<4,4>(0,4*i);
+        newIndex(i) = 0; //unncessary bc index starts at 0
       }
     }
 
+    for(int i = 0; i <indexOrder.cols(); i++  )
+    {
+      if(newIndex(i) >  NUM_DRONES)
+      {
+        newIndex(i) = int(newIndex(i))%NUM_DRONES;
+      }
+    }
+
+    cout << "newIndex: "  << newIndex << endl;
+
+    int sortedIndex = 0;
+    //sort highest weight to correct association
+    for(int i = 0; i <indexOrder.cols(); i++  )
+    {
+      sortedIndex = newIndex(i);
+      wk_bar_fixed(sortedIndex) = wk_bar(i);
+      mk_bar_fixed.block<4,1>(0,sortedIndex) = mk_bar.block<4,1>(0,i);
+      Pk_bar_fixed.block<4,4>(0,4*sortedIndex) = Pk_bar.block<4,4>(0,4*i);
+    }
+  }
 
 
-/*
+
+  /*
   //sum weight
   for(int i = 0; i < numTargets_Jk_k_minus_1; i++)
   {
@@ -568,7 +391,7 @@ void Node::phd_prune()
   cout << "mk_bar: " << endl << mk_bar << endl;
 */
 
-    /*
+  /*
   Eigen::MatrixXf P_bar_sum, P_val, delta_m;
   P_val = Eigen::MatrixXf(4,4);
   delta_m = Eigen::MatrixXf(4,1);
@@ -604,14 +427,14 @@ void Node::phd_prune()
 
 
   numTargets_Jk_minus_1 = wk_bar_fixed.cols();
-//  cout << "Pk_bar_fixed: " << endl << setprecision(3) << Pk_bar_fixed << endl;
+  //  cout << "Pk_bar_fixed: " << endl << setprecision(3) << Pk_bar_fixed << endl;
 
 
 
 }
 
 
-void Node::phd_state_extract()
+void PhdFilter::phd_state_extract()
 {
 
   Eigen::MatrixXf velocity;
@@ -634,65 +457,100 @@ void Node::phd_state_extract()
 
 }
 
-void Node::removeColumn(Eigen::MatrixXd& matrix, unsigned int colToRemove)
+void PhdFilter::initialize()
 {
-    unsigned int numRows = matrix.rows();
-    unsigned int numCols = matrix.cols()-1;
+  Eigen::MatrixXf P_k_init;
+  P_k_init = Eigen::MatrixXf(4,4);
+  P_k_init <<
+              10,0,0,0,
+      0,10,0,0,
+      0,0,5,0,
+      0,0,0,5;
 
-    if( colToRemove < numCols )
-        matrix.block(0,colToRemove,numRows,numCols-colToRemove) = matrix.block(0,colToRemove+1,numRows,numCols-colToRemove);
 
-    matrix.conservativeResize(numRows,numCols);
-}
-
-void Node::removeColumnf(Eigen::MatrixXf& matrix, unsigned int colToRemove)
-{
-    unsigned int numRows = matrix.rows();
-    unsigned int numCols = matrix.cols()-1;
-
-    if( colToRemove < numCols )
-        matrix.block(0,colToRemove,numRows,numCols-colToRemove) = matrix.block(0,colToRemove+1,numRows,numCols-colToRemove);
-
-    matrix.conservativeResize(numRows,numCols);
-}
-
-void Node::draw_image()
-{
-  for(int k =0; k < X_k.cols(); k ++)
+  for(int i = 0; i < mk_minus_1.cols(); i ++)
   {
-    cv::Point2f target_center(X_k(0,k),X_k(1,k));
-    cv::Point2f id_pos(X_k(0,k),X_k(1,k)+10);
-    cv::circle(input_image,target_center,2, cv::Scalar(0, 210, 255), 2);
-    putText(input_image, to_string(k), id_pos, cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0, cvScalar(0, 255, 0), 2, CV_AA);//size 1.5 --> 0.5
+    //store Z into mk (x,y)
+    mk_minus_1(0,i) = Z_k(0,i);
+    mk_minus_1(1,i) = Z_k(1,i);
+    mk_minus_1(2,i) = 0;
+    mk_minus_1(3,i) = 0;
+
+    //store pre-determined weight into wk (from matlab)
+    wk_minus_1(i) = .0016;
+
+    //store pre-determined weight into Pk (from paper)
+    Pk_minus_1.block<4,4>(0,i*4) = P_k_init;
+  }
+
+
+
+  F << 1,0,1,0,
+      0,1,0,1,
+      0,0,1,0,
+      0,0,0,1;
+
+  int dt =1;
+  int sigma_v = 5;
+  //Q = sigma_v^2 * [ [1/4*dt^4*I2, 1/2*dt^3*I2]; [1/2*dt^3* I2, dt^2*I2] ]; %Process noise covariance, given in Vo&Ma.
+
+  Q << 6.25, 0, 12.5, 0,
+      0, 6.25, 0, 12.5,
+      12.5, 0, 25, 0,
+      0, 12.5, 0, 25;
+
+  R << 100,0,0,0,
+      0,100,0,0,
+      0,0,100,0,
+      0,0,0,100;
+
+  numTargets_Jk_minus_1 = NUM_DRONES;
+}
+
+float PhdFilter::clutter_intensity(const float ZmeasureX, const float ZmeasureY)
+{
+  float xMin = 0;
+  float xMax = 360;
+  float yMin = 0;
+  float yMax = 240;
+  float uniform_dist = 0;
+  float clutter_intensity = 0;
+  float lambda = 12.5*pow(10,-6);
+  float volume = 4*pow(10,6);
+
+  if(ZmeasureX < xMin) return 0;
+  else if (ZmeasureX > xMax) return 0;
+  else if (ZmeasureY < yMin) return 0;
+  else if (ZmeasureY > yMax) return 0;
+  else
+  {
+    uniform_dist = 1 / ( (xMax - xMin)*(yMax - yMin) );
 
   }
 
-  ROS_INFO("pub image");
+  clutter_intensity = lambda * volume * uniform_dist;
 
-//  cv_bridge::CvImage processed_image_bridge;
-////  processed_image_bridge.header.stamp = image_msg->header.stamp;
-//  processed_image_bridge.image = input_image;
-//  processed_image_bridge.encoding = sensor_msgs::image_encodings::RGB8;
-
-//  image_msg = processed_image_bridge.toImageMsg();
-  image_msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", input_image).toImageMsg();
-  image_pub_.publish(image_msg);
-
+  return clutter_intensity;
 }
 
+void PhdFilter::removeColumn(Eigen::MatrixXd& matrix, unsigned int colToRemove)
+{
+  unsigned int numRows = matrix.rows();
+  unsigned int numCols = matrix.cols()-1;
 
+  if( colToRemove < numCols )
+    matrix.block(0,colToRemove,numRows,numCols-colToRemove) = matrix.block(0,colToRemove+1,numRows,numCols-colToRemove);
+
+  matrix.conservativeResize(numRows,numCols);
 }
 
+void PhdFilter::removeColumnf(Eigen::MatrixXf& matrix, unsigned int colToRemove)
+{
+  unsigned int numRows = matrix.rows();
+  unsigned int numCols = matrix.cols()-1;
 
-int main(int argc, char **argv) {
-  ros::init(argc, argv, "phd_tracker");
-  ros::NodeHandle nh;
-  ros::NodeHandle pnh("~");
+  if( colToRemove < numCols )
+    matrix.block(0,colToRemove,numRows,numCols-colToRemove) = matrix.block(0,colToRemove+1,numRows,numCols-colToRemove);
 
-  phd_tracker::Node node(nh, pnh);
-
-
-  ros::spin();
-  return 0;
-
+  matrix.conservativeResize(numRows,numCols);
 }
