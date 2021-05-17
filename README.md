@@ -11,19 +11,18 @@ This is ROS package developed for tracking multiple agents using a camera. This 
 Affiliation: [NYU ARPL](https://wp.nyu.edu/arpl/)<br />
 Maintainer: Mark Lee, ml7617@nyu.edu<br />**
 
-## Subscribed Topics
+### Subscribed Topics
 |Name|Type|Description|
 |---|---|---|
 |`/darknet_ros/bounding_boxes`|darknet_ros_msgs/BoundingBoxes|output 2D position from darknet ros pacackage|
 |`/darknet_ros/detection_image`|sensor_msgs/Image|RGB image|
 
-## Published Topics
+### Published Topics
 |Name|Type|Description|
 |---|---|---|
 |`/tracked_image`|sensor_msgs/Image|RGB with position, ID association labeled|
 
-
-## ROS Parameters
+### ROS Parameters
 |Name|Description|
 |---|---|
 |`filter`|phd or jpdaf specify in the demo.launch file|
