@@ -2,10 +2,10 @@
 Multi Agent Tracking for Data Association
 
 ## Overview
-This is ROS package developed for tracking multiple agents using a camera. This software is designed for associating 2D bounding box measurements (of drones) to unique IDs and 2D position in image space. The required inputs for this software are 2d bounding box measurements and RGB image. The provided outputs are 2D positions with target associations. The motion model is based on Gaussian Linear kalman filter with probabilistic hypothesis density (PHD) filter to solve association. This repository includes matlab implementation and evaluation as well as cpp version.    
+This is ROS package developed for tracking multiple agents using a camera. This software is designed for associating 2D bounding box measurements (of drones) to unique IDs and 2D position in image space. The required inputs for this software are 2d bounding box measurements and RGB image. The provided outputs are 2D positions with target associations. The motion model is based on Gaussian Linear kalman filter with probabilistic hypothesis density (PHD) filter to solve association. Can also run Joint Probability Association filter (JPDAF) by switching rosparam upon launch. This repository includes matlab implementation and evaluation as well.    
 
-Input rostopic: /darknet_ros/bounding_boxes (Type: darknet_ros_msgs/BoundingBoxes)<br />
-Output rostopic: /phd_tracker/tracked_image (Type: sensor_msgs/Image)<br />
+'Input rostopic: /darknet_ros/bounding_boxes (Type: darknet_ros_msgs/BoundingBoxes)<br />
+'Output rostopic: /phd_tracker/tracked_image (Type: sensor_msgs/Image)<br />
 
 ![Screenshot](doc/tracking.png)
 
@@ -26,9 +26,9 @@ $ catkin_make darknet_ros -DCMAKE_BUILD_TYPE=Release
 $ source devel/setup.bash
 ```
 
-install phd filter into catkin directory
+install filter repository into catkin directory
 ```
-$ git clone https://github.com/MarkLee634/phd_filter.git
+$ git clone https://github.com/arplaboratory/multi_robot_tracking.git
 $ cd ..
 $ catkin_make
 $ source devel/setup.bash
