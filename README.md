@@ -57,7 +57,7 @@ $ roscd multi_robot_tracking/launch/
 $ roslaunch demo.launch
 ```
 
-A. Running with recorded Rosbag. </br>
+A. Testing with recorded Rosbag. </br>
 Move rosbag data into corresponding directory. Modify the rostopic subscriber in multi_robot_tracking_nodelet.cpp if wanting to modify using a different measured input.
 ```
 $ roscd multi_robot_tracking/launch/
@@ -66,7 +66,7 @@ $ roslaunch demo.launch
 $ rosbag play darknet_detection_3drones_VICON_TobiiGlasses.bag 
 ```
 
-B. Running with simulation. </br>
+B. Testing with simulation. </br>
 We can also utilize the Flightare simulator for photorealistic rendering to create new data. Refer to [Flightmare github page](https://github.com/uzh-rpg/flightmare) for installation and setting up dependencies. <br />
 Running the below code launches Flightmare simulation with Gazebo for multiple drones, multimotion creates trajectories for all drones, and phd_tracker associates each target in space.
 ```
@@ -80,6 +80,6 @@ $ roscd multi_robot_tracking/launch/
 $ roslaunch demo.launch
 ```
 
-C. Running Matlab for Evaluation
+C. Testing Matlab for Evaluation
 Move the corresponding rosbag data to the Matlab directory. Make sure the GM_PHD_Initialisation_drones.m file points to the correct directory for rosbag data. 
 
