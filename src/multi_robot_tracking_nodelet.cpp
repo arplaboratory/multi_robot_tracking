@@ -360,6 +360,8 @@ void multi_robot_tracking_Nodelet::vicon_drone5_Callback(const nav_msgs::Odometr
 void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseArray& in_PoseArray)
 {
   ROS_INFO("detected size: %lu ", in_PoseArray.poses.size() );
+  jpdaf_filter_.last_timestamp_synchronized = in_PoseArray.header.stamp.toSec();
+
   //store Z
 
   //========= use jpdaf filter ===========
@@ -367,30 +369,18 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
   {
 
     jpdaf_filter_.detected_size_k = in_PoseArray.poses.size();
-    jpdaf_filter_.Z_k = Eigen::MatrixXf::Zero(4,jpdaf_filter_.detected_size_k);
 
+    //store Z
+    jpdaf_filter_.flightmare_bounding_boxes_msgs_buffer_.push_back(in_PoseArray);
+//    jpdaf_filter_.Z_k = Eigen::MatrixXf::Zero(4,jpdaf_filter_.detected_size_k);
 
-    for(int i =0; i < jpdaf_filter_.detected_size_k; i++)
-    {
-      jpdaf_filter_.Z_k(0,i) = in_PoseArray.poses[i].position.x;
-      jpdaf_filter_.Z_k(1,i) = in_PoseArray.poses[i].position.y;
-    }
+//    for(int i =0; i < jpdaf_filter_.detected_size_k; i++)
+//    {
+//      jpdaf_filter_.Z_k(0,i) = in_PoseArray.poses[i].position.x;
+//      jpdaf_filter_.Z_k(1,i) = in_PoseArray.poses[i].position.y;
+//    }
 
-    if(jpdaf_filter_.first_callback)
-    {
-
-      jpdaf_filter_.initialize_matrix();
-      jpdaf_filter_.first_callback = false;
-
-    }
-
-    else {
-
-      jpdaf_filter_.track();
-
-    }
-
-
+      jpdaf_filter_.track(true);
   }
 
   //========= use phd filter ===========
