@@ -1,11 +1,8 @@
-# PHD_Filter
-Multi Agent Tracking for Data Association
+# Multi Agent Tracking 
+Multi Agent Tracking for Data Association with various filter comparison
 
 ## Overview
 This is ROS package developed for tracking multiple agents using a camera. This software is designed for associating 2D bounding box measurements (of drones) to unique IDs and 2D position in image space. The required inputs for this software are 2d bounding box measurements and RGB image. The provided outputs are 2D positions with target associations. The motion model is based on Gaussian Linear kalman filter with probabilistic hypothesis density (PHD) filter to solve association. Can also run Joint Probability Association filter (JPDAF) by switching rosparam upon launch. This repository includes matlab implementation and evaluation as well.    
-
-'Input rostopic: /darknet_ros/bounding_boxes (Type: darknet_ros_msgs/BoundingBoxes)<br />
-'Output rostopic: /phd_tracker/tracked_image (Type: sensor_msgs/Image)<br />
 
 ![Screenshot](doc/tracking.png)
 
@@ -13,6 +10,23 @@ This is ROS package developed for tracking multiple agents using a camera. This 
 **Developer: Mark Lee<br />
 Affiliation: [NYU ARPL](https://wp.nyu.edu/arpl/)<br />
 Maintainer: Mark Lee, ml7617@nyu.edu<br />**
+
+## Subscribed Topics
+|Name|Type|Description|
+|---|---|---|
+|`/darknet_ros/bounding_boxes`|darknet_ros_msgs/BoundingBoxes|output 2D position from darknet ros pacackage|
+|`/darknet_ros/detection_image`|sensor_msgs/Image|RGB image|
+
+## Published Topics
+|Name|Type|Description|
+|---|---|---|
+|`/tracked_image`|sensor_msgs/Image|RGB with position, ID association labeled|
+
+
+## ROS Parameters
+|Name|Description|
+|---|---|
+|`filter`|phd or jpdaf specify in the demo.launch file|
 
 
 ## Install
