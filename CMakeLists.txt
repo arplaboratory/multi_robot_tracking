@@ -33,6 +33,15 @@ catkin_package(
   EIGEN3
 )
 
+# include headers
+include_directories(
+  ${catkin_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
+  ${Eigen_INCLUDE_DIRS}
+  include
+  include/multi_robot_tracking
+)
+
 add_library(multi_robot_tracking src/jpdaf_filter.cpp src/phd_filter.cpp src/multi_robot_tracking_nodelet.cpp)
 target_include_directories(multi_robot_tracking PUBLIC include ${catkin_INCLUDE_DIRS})
 target_link_libraries(multi_robot_tracking PUBLIC ${catkin_LIBRARIES} Eigen3::Eigen)

@@ -21,18 +21,23 @@
 #include <iostream>
 #include <iomanip>
 
+//jpdaf
+#include <multi_robot_tracking/detection.h>
+
 
 #define PI 3.14159
 #define NUM_DRONES 3
 
+
 class JpdafFilter
 {
- public:
+public:
   JpdafFilter();
 
   //functions
   void initialize_matrix();
   void track();
+  std::vector<Detection> get_detections_flightmare(Eigen::MatrixXf& z_matrix);
 
   //variables
   int detected_size_k;
@@ -41,7 +46,7 @@ class JpdafFilter
 
 
 
- private:
+private:
 
 
 };
