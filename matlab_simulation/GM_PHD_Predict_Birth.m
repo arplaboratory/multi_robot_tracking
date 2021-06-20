@@ -30,6 +30,8 @@ for j = 1:numBirthedTargets
     P_birth(:,P_range) = Q + F * P_birth(:,P_range) * F';
 end
 
+
+
 if(VERBOSE == 1)
   for j = 1:numBirthedTargets
         thisM = m_birth(:,j);

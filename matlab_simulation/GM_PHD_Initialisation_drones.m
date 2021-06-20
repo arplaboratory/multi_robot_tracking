@@ -13,6 +13,7 @@ if(USE_REAL_DATA)
     glass_bag = select(real_bag, 'Topic', "/vicon/TobiiGlasses/odom");
     drone1_bag = select(real_bag, 'Topic', "/vicon/DragonFly1/odom");
     
+    
     %get bbox topic
     [real_pos_array_original] = read_bbox_pos(bbox_bag, DOWN_SAMPLE);
     
@@ -31,9 +32,12 @@ if(USE_REAL_DATA)
     
 else
     %% Read Rosbag and fill in PX, PY
-    measure_bag = rosbag("jpdaf_track_corrected_2021-02-11-18-08-33.bag");
-    pos_bag = select(measure_bag, 'Topic', "/hummingbird1/track/bounding_box");
+    measure_bag = rosbag("drone_2d_3drones_imu.bag");
+    pos_bag = select(measure_bag, 'Topic', "/hummingbird0/track/bounding_box");
+    imu_bag = select(measure_bag, 'Topic', "/hummingbird0/imu");
+
     pos_array = read_array_pos(pos_bag, DOWN_SAMPLE);
+    imu_array = read_array_imu(imu_bag, DOWN_SAMPLE);
     
     DATA_SIZE = size(pos_array(1).x, 1)-20;
     
@@ -154,7 +158,7 @@ P_bar_k_fixed = zeros(4,4*NUM_DRONES);
 %purposes. This is updated in the end of GM_PHD_Estimate
 X_k_history = [];
 
-
+u_history = [];
 
 %Step 7: Create birthed/spawned targets to append to list next iteration
 %These are set in GM_PHD_Create_Birth
@@ -179,10 +183,18 @@ clutter_intensity = @(z_cartesian) lambda_c * V * unifpdf_2d(xrange, yrange, z_c
 %Prediction models - used in steps 1 & 2 for prediction
 I2 = eye(2);%2x2 identify matrix, used to construct matrices
 Z2 = zeros(2);%2x2 zero matrix, used to construct matrices
-dt = 1; %One-second sampling period
+dt = 0.1205; %One-second sampling period
 F = [ [I2, dt*I2]; [Z2 I2] ];%State transition matrix (motion model)
+
+B = []; %control input matrix
+
+cx = 180; %img width/2
+cy = 120; %img height/2
+f = 120; %focal length of cam
+
 sigma_v = 5; %Standard deviation of process noise is 5 m/(s^2)
 Q = sigma_v^2 * [ [1/4*dt^4*I2, 1/2*dt^3*I2]; [1/2*dt^3* I2, dt^2*I2] ]; %Process noise covariance, given in Vo&Ma.
+%Q = [dt^2/2 0 0 0; 0 dt^2/2 0 0; 0 0 dt 0 ; 0 0 0 dt];
 
 %% Birth model. This is a Poisson random finite set.
 %We only use the first two elements as the initial velocities are unknown
@@ -201,8 +213,8 @@ else
     
 end
 
-covariance_birth = diag([10, 10, 5, 5]');%Used in birth_intensity function
-covariance_spawn = diag([10, 10, 5, 5]');%Used in spawn_intensity function
+covariance_birth = diag([20, 20, 8, 8]');%Used in birth_intensity function
+covariance_spawn = diag([20, 20, 8, 8]');%Used in spawn_intensity function
 covariance_spawn = max(covariance_spawn, 10^-6);%Used in spawn_intensity function
 
 birth_intensity = @(x) (0.1 * mvnpdf(x(1:2)', birth_mean1(1:2)', covariance_birth(1:2,1:2)) + 0.1 * mvnpdf(x(1:2)', birth_mean2(1:2)', covariance_birth(1:2,1:2)) + (0.1 * mvnpdf(x(1:2)', birth_mean3(1:2)', covariance_birth(1:2,1:2))) );%Generate birth weight. This only takes into account the position, not the velocity, as Vo&Ma don't say if they use velocity and I assume that they don't. Taken from page 8 of their paper.
@@ -215,7 +227,7 @@ prob_detection = 1; %Probability of target detection. Used in recalculating weig
 if(USE_EKF == 0)
     H = [I2, Z2];%Observation matrix for position. Not used, but if you wanted to cut back to just tracking position, might be useful.
     H2 = eye(4);%Observation matrix for position and velocity. This is the one we actually use, in GM_PHD_Construct_Update_Components
-    sigma_r = 5; %Standard deviation of measurement noise is 10m. Used in creating R matrix (below)
+    sigma_r = 2; % measurement noise 
     R = sigma_r^2 * I2;%Sensor noise covariance. used in R2 (below)
     R2 = [ [R, Z2]; [Z2, 2*R] ];%Measurement covariance, expanded to both position & velocity. Used in GM_PHD_Construct_Update_Components. NOTE: This assumes that speed measurements have the same covariance as position measurements. I have no mathematical justification for this.
 end
@@ -254,7 +266,39 @@ pos_array3.time = odom_time3;
 pos_array = [pos_arrayOne pos_arrayTwo pos_array3];
 end
 
+%% read imu to get ang vel
+function imu_array = read_array_imu(array, DOWN_SAMPLE)
 
+robot_imuStructs = readMessages(array,'DataFormat','struct');
+x = cellfun(@(m) double(m.AngularVelocity.X),robot_imuStructs);
+y = cellfun(@(m) double(m.AngularVelocity.Y),robot_imuStructs);
+z = cellfun(@(m) double(m.AngularVelocity.Z),robot_imuStructs);
+time = cellfun(@(m) double(double(m.Header.Stamp.Sec)+double(m.Header.Stamp.Nsec)*10e-10),robot_imuStructs);
+
+imu_array = [x y z time];
+
+
+end
+
+%% read bag pose data
+function pos_array = read_odom_pos(array, DOWN_SAMPLE)
+
+odom_posStructs = readMessages(array,'DataFormat','struct');
+x = cellfun(@(m) double(m.Pose.Pose.Position.X),odom_posStructs);
+y = cellfun(@(m) double(m.Pose.Pose.Position.Y),odom_posStructs);
+z = cellfun(@(m) double(m.Pose.Pose.Position.Z),odom_posStructs);
+time = cellfun(@(m) double(double(m.Header.Stamp.Sec)+double(m.Header.Stamp.Nsec)*10e-10),odom_posStructs);
+
+
+% pos_arrayOne.x = x(1:DOWN_SAMPLE:end); %x;
+% pos_arrayOne.y = y(1:DOWN_SAMPLE:end); %y;
+% pos_arrayOne.z = z(1:DOWN_SAMPLE:end); %z;
+% pos_arrayOne.time = odom_time;
+% 
+
+
+pos_array = [x y z time];
+end
 
 %% read bbox to get pos data 1,2,3
 function [pos_array] = read_bbox_pos(array, DOWN_SAMPLE)
@@ -285,22 +329,3 @@ pos_array = poseArray;
 
 end
 
-%% read bag pose data
-function pos_array = read_odom_pos(array, DOWN_SAMPLE)
-
-odom_posStructs = readMessages(array,'DataFormat','struct');
-x = cellfun(@(m) double(m.Pose.Pose.Position.X),odom_posStructs);
-y = cellfun(@(m) double(m.Pose.Pose.Position.Y),odom_posStructs);
-z = cellfun(@(m) double(m.Pose.Pose.Position.Z),odom_posStructs);
-time = cellfun(@(m) double(double(m.Header.Stamp.Sec)+double(m.Header.Stamp.Nsec)*10e-10),odom_posStructs);
-
-
-% pos_arrayOne.x = x(1:DOWN_SAMPLE:end); %x;
-% pos_arrayOne.y = y(1:DOWN_SAMPLE:end); %y;
-% pos_arrayOne.z = z(1:DOWN_SAMPLE:end); %z;
-% pos_arrayOne.time = odom_time;
-% 
-
-
-pos_array = [x y z time];
-end

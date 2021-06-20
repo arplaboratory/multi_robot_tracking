@@ -143,7 +143,7 @@ metric_history = [];%History of the OSPA performance metric
 %Prediction models - used in steps 1 & 2 for prediction
 I2 = eye(2);%2x2 identify matrix, used to construct matrices
 Z2 = zeros(2);%2x2 zero matrix, used to construct matrices
-dt = 1; %One-second sampling period
+dt = 0.04; %One-second sampling period
 F = [ [I2, dt*I2]; [Z2 I2] ];%State transition matrix (motion model)
 sigma_v = 5; %Standard deviation of process noise is 5 m/(s^2)
 Q = sigma_v^2 * [ [1/4*dt^4*I2, 1/2*dt^3*I2]; [1/2*dt^3* I2, dt^2*I2] ]; %Process noise covariance, given in Vo&Ma.

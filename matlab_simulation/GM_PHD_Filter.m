@@ -52,6 +52,8 @@ if(MHT)
    mergeThresholdU = 0; 
 end
 
+digits(3) %significant point
+
 %Main loop
 while (k < endTime)%k = timestep
     k = k + 1;
@@ -63,16 +65,23 @@ while (k < endTime)%k = timestep
     %Step 0: Sim Generate sensor Measurements
     
     GM_PHD_Simulate_Measurements_drones;  %Linear KF measurements are simulated direct observations [X; Y] of the target positions
+    Z = Z
     
     %Step 1: Prediction for birthed/spawned targets
     GM_PHD_Predict_Birth;
+    %m_birth_print = vpa(m_birth)
+    
     %Step 2: Prediction for existing targets
     GM_PHD_Predict_Existing;
+    mk_k_minus_1_print = vpa(mk_k_minus_1);
+    
     %Step 3: Construction of PHD update components
     GM_PHD_Construct_Update_Components;
+    
     %Step 4: Update targets with measurements
     GM_PHD_Update;
-    
+    w_k_print = vpa(w_k)
+    m_k_print = vpa(m_k)
     
     %Step 5: Prune targets
     if(MHT ==1)
@@ -85,6 +94,7 @@ while (k < endTime)%k = timestep
     
     %Step 6: Estimate position of targets
     GM_PHD_Estimate
+    X_k_print = vpa(X_k)
     
     %Step 7: Create birthed-targets-list to add next iteration in Step 1.
     %Not a formal part of Vo&Ma but an essential step!

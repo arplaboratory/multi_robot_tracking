@@ -39,6 +39,12 @@ simTarget1State = [pos_array(1).x(k); pos_array(1).y(k); simTarget1Vel];
 simTarget2State = [pos_array(2).x(k); pos_array(2).y(k); simTarget2Vel]; 
 simTarget3State = [pos_array(3).x(k); pos_array(3).y(k); simTarget3Vel]; 
 
+length_imu_data = length(imu_array);
+length_pose_data = length(pos_array(1).x);
+data_index_imu = floor(length_imu_data/length_pose_data);
+
+simCameraVel = [imu_array(data_index_imu*k,1); imu_array(data_index_imu*k,2); imu_array(data_index_imu*k,3)];
+
 %Save target movement for plotting
 simTarget1History = [simTarget1History, simTarget1State];
 simTarget2History = [simTarget2History, simTarget2State];
