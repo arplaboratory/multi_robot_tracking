@@ -64,6 +64,8 @@ $ roscd multi_robot_tracking/launch/
 $ roslaunch demo.launch
 -- open a new tab and navigate to rosbag directory
 $ rosbag play darknet_detection_3drones_VICON_TobiiGlasses.bag 
+-- if using a rosbag from flightmare simulator
+$ rosbag play drone_2d_3drones_imu.bag --clock 
 ```
 
 B. Testing with simulation. </br>
