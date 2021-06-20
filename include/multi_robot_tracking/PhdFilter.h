@@ -1,6 +1,6 @@
 #include <Eigen/Geometry>
 #include <Eigen/Dense>
-#include <eigen_conversions/eigen_msg.h>
+//#include <eigen_conversions/eigen_msg.h>
 #include <math.h>
 
 //ros
@@ -23,7 +23,7 @@
 
 
 #define PI 3.14159
-#define NUM_DRONES 3
+//#define NUM_DRONES 3
 
 class PhdFilter
 {
@@ -41,6 +41,7 @@ class PhdFilter
   void removeColumnf(Eigen::MatrixXf& matrix, unsigned int colToRemove);
 
   void initialize();
+  void set_num_drones(int num_drones);
   float clutter_intensity(const float X, const float Y);
   Eigen::MatrixXf left_divide(const Eigen::MatrixXf);
 
@@ -48,6 +49,7 @@ class PhdFilter
   ros::Time startTime,endTime,processTime;
 
   geometry_msgs::PoseArray Z_current_k;
+  int NUM_DRONES;
   int detected_size_k;
 
   float last_timestamp_synchronized;
@@ -56,6 +58,8 @@ class PhdFilter
   int numTargets_Jk_k_minus_1;
   int numTargets_Jk_minus_1;
   int L = 0;
+
+  int k_iteration = 0;
 
 
   //kalman filter variables
@@ -94,7 +98,10 @@ class PhdFilter
   Eigen::MatrixXf mk_k_minus_1_beforePrediction;
 
   Eigen::MatrixXf Z_k;
+  Eigen::MatrixXf ang_vel_k;
   Eigen::MatrixXf X_k;
+
+  Eigen::MatrixXf B;
 
   cv::Mat input_image;
   sensor_msgs::ImagePtr image_msg;

@@ -8,50 +8,57 @@ using namespace std;
 PhdFilter::PhdFilter()
 
 {
-  initialize_matrix();
+
 }
 
 void PhdFilter::initialize_matrix()
 {
-
+    ROS_INFO("first initialize matrix");
   //initialize
-  mk_minus_1 = Eigen::MatrixXf(4,NUM_DRONES);
-  wk_minus_1 = Eigen::MatrixXf(1,NUM_DRONES);
-  Pk_minus_1 = Eigen::MatrixXf(4,NUM_DRONES*4);
+  Z_k = Eigen::MatrixXf::Zero(4,NUM_DRONES);
+  ang_vel_k = Eigen::MatrixXf::Zero(3,1);
 
-  mk = Eigen::MatrixXf(4,NUM_DRONES+NUM_DRONES*NUM_DRONES);
-  wk = Eigen::MatrixXf(1,NUM_DRONES+NUM_DRONES*NUM_DRONES);
-  Pk = Eigen::MatrixXf(4,4*(NUM_DRONES+NUM_DRONES*NUM_DRONES) );
+  mk_minus_1 = Eigen::MatrixXf::Zero(4,NUM_DRONES);
+  wk_minus_1 = Eigen::MatrixXf::Zero(1,NUM_DRONES);
+  Pk_minus_1 = Eigen::MatrixXf::Zero(4,NUM_DRONES*4);
 
-  mk_bar = Eigen::MatrixXf(4,NUM_DRONES);
-  wk_bar = Eigen::MatrixXf(1,NUM_DRONES);
-  Pk_bar = Eigen::MatrixXf(4,4*NUM_DRONES);
+  mk = Eigen::MatrixXf::Zero(4,NUM_DRONES+NUM_DRONES*NUM_DRONES);
+  wk = Eigen::MatrixXf::Zero(1,NUM_DRONES+NUM_DRONES*NUM_DRONES);
+  Pk = Eigen::MatrixXf::Zero(4,4*(NUM_DRONES+NUM_DRONES*NUM_DRONES) );
 
-  mk_bar_fixed = Eigen::MatrixXf(4,NUM_DRONES);
-  wk_bar_fixed = Eigen::MatrixXf(1,NUM_DRONES);
-  Pk_bar_fixed = Eigen::MatrixXf(4,4*NUM_DRONES);
+  mk_bar = Eigen::MatrixXf::Zero(4,NUM_DRONES);
+  wk_bar = Eigen::MatrixXf::Zero(1,NUM_DRONES);
+  Pk_bar = Eigen::MatrixXf::Zero(4,4*NUM_DRONES);
+
+  mk_bar_fixed = Eigen::MatrixXf::Zero(4,NUM_DRONES);
+  wk_bar_fixed = Eigen::MatrixXf::Zero(1,NUM_DRONES);
+  Pk_bar_fixed = Eigen::MatrixXf::Zero(4,4*NUM_DRONES);
 
 
 
-  mk_k_minus_1 = Eigen::MatrixXf(4,NUM_DRONES);
-  wk_k_minus_1 = Eigen::MatrixXf(1,NUM_DRONES);
-  Pk_k_minus_1 = Eigen::MatrixXf(4,4*NUM_DRONES);
-  P_k_k = Eigen::MatrixXf(4,4*NUM_DRONES);
-  S = Eigen::MatrixXf(4,4*NUM_DRONES);
+  mk_k_minus_1 = Eigen::MatrixXf::Zero(4,NUM_DRONES);
+  wk_k_minus_1 = Eigen::MatrixXf::Zero(1,NUM_DRONES);
+  Pk_k_minus_1 = Eigen::MatrixXf::Zero(4,4*NUM_DRONES);
+  P_k_k = Eigen::MatrixXf::Zero(4,4*NUM_DRONES);
+  S = Eigen::MatrixXf::Zero(4,4*NUM_DRONES);
 
-  F = Eigen::MatrixXf(4,4);
-  Q = Eigen::MatrixXf(4,4);
-  R = Eigen::MatrixXf(4,4);
-  K = Eigen::MatrixXf(4,4*NUM_DRONES);
+  F = Eigen::MatrixXf::Zero(4,4);
+  Q = Eigen::MatrixXf::Zero(4,4);
+  R = Eigen::MatrixXf::Zero(4,4);
+  K = Eigen::MatrixXf::Zero(4,4*NUM_DRONES);
 
   X_k = Eigen::MatrixXf::Zero(4,NUM_DRONES);
 
-  mk_k_minus_1_beforePrediction = Eigen::MatrixXf(4,NUM_DRONES);
+  B = Eigen::MatrixXf::Zero(4,3*NUM_DRONES);
+
+  mk_k_minus_1_beforePrediction = Eigen::MatrixXf::Zero(4,NUM_DRONES);
 }
 
 void PhdFilter::phd_track()
 {
   startTime = ros::Time::now();
+  k_iteration = k_iteration + 1;
+  ROS_INFO("iter: %d",k_iteration);
 
   //predict existing
   phd_predict_existing();
@@ -75,12 +82,19 @@ void PhdFilter::phd_track()
 void PhdFilter::phd_predict_existing()
 {
   ROS_INFO("======= 1. predict ======= \n");
+
+
   mk_k_minus_1_beforePrediction = mk_minus_1;
 
   wk_minus_1 = prob_survival * wk_minus_1;
-  mk_minus_1 = F * mk_minus_1;
 
-  //  cout << "P: " << endl << Pk_minus_1 << endl;
+
+  for (int i = 0; i < mk_minus_1.cols(); i++)
+  {
+      //cout << "i: " << i << endl;
+
+      mk_minus_1.block<4,1>(0,i) = F * mk_minus_1.block<4,1>(0,i); // + B.block<4,3>(0,3*i) * ang_vel_k;
+  }
 
   Eigen::MatrixXf P_temp;
   P_temp = Eigen::MatrixXf(4,4);
@@ -92,9 +106,9 @@ void PhdFilter::phd_predict_existing()
     Pk_minus_1.block<4,4>(0,4*j) = P_temp;
   }
 
-  //   cout << "P: " << endl << Pk_minus_1 << endl;
-  //   cout << "mk-1: " << endl << setprecision(3) << mk_minus_1 << endl;
-  //   cout << "wk-1: " << endl << setprecision(3) << wk_minus_1 << endl;
+//     cout << "P: " << endl << Pk_minus_1 << endl;
+//     cout << "mk-1: " << endl << setprecision(3) << mk_minus_1 << endl;
+//     cout << "wk-1: " << endl << setprecision(3) << wk_minus_1 << endl;
 
 
   wk_k_minus_1 = wk_minus_1;
@@ -107,8 +121,6 @@ void PhdFilter::phd_predict_existing()
 void PhdFilter::phd_construct()
 {
   ROS_INFO("======= 2. construct ======= \n");
-
-
   Eigen::MatrixXf PHt, S_j, SChol, SCholInv, identity, w1;
   PHt = Eigen::MatrixXf(4,4);
   S_j = Eigen::MatrixXf(4,4);
@@ -119,6 +131,7 @@ void PhdFilter::phd_construct()
 
   for(int j = 0; j < numTargets_Jk_k_minus_1; j ++)
   {
+
     PHt = Pk_k_minus_1.block<4,4>(0,4*j);
     S_j = R + PHt;
     SChol = S_j.llt().matrixU();
@@ -134,7 +147,7 @@ void PhdFilter::phd_construct()
 
   }
 
-  //  cout << "P_k_k: " << endl << P_k_k << endl;
+//    cout << "P_k_k: " << endl << P_k_k << endl;
   //    cout << "K: " << endl << K << endl;
 
 
@@ -163,7 +176,7 @@ void PhdFilter::phd_update()
   int index = 0;
   L = 0;
 
-  cout << "numTargets_Jk_k_minus_1: " << endl << numTargets_Jk_k_minus_1 << endl;
+//  cout << "numTargets_Jk_k_minus_1: "  << numTargets_Jk_k_minus_1 << endl;
 
   //2. update first columns of m_k which corresponds to no new detections
   for (int i = 0; i < numTargets_Jk_k_minus_1; i++ )
@@ -174,7 +187,7 @@ void PhdFilter::phd_update()
 
   }
 
-  cout << "# of Z: "  << detected_size_k << ", # of Jk: "<< numTargets_Jk_k_minus_1 <<  endl;
+//  cout << "# of Z: "  << detected_size_k << ", # of Jk: "<< numTargets_Jk_k_minus_1 <<  endl;
 
 
 
@@ -267,7 +280,7 @@ void PhdFilter::phd_prune()
   //find weights threshold
   for(int i = 0; i < wk.cols(); i ++)
   {
-    if(wk(i) > 0.0005)
+    if(wk(i) > 0.00005)
     {
       index_counter++;
       I.conservativeResize(1,index_counter);
@@ -457,6 +470,11 @@ void PhdFilter::phd_state_extract()
 
 }
 
+void PhdFilter::set_num_drones(int num_drones_in)
+{
+  NUM_DRONES = num_drones_in;
+}
+
 void PhdFilter::initialize()
 {
   Eigen::MatrixXf P_k_init;
@@ -468,13 +486,15 @@ void PhdFilter::initialize()
       0,0,0,5;
 
 
-  for(int i = 0; i < mk_minus_1.cols(); i ++)
+  for(int i = 0; i < Z_k.cols(); i ++)
   {
+
     //store Z into mk (x,y)
     mk_minus_1(0,i) = Z_k(0,i);
     mk_minus_1(1,i) = Z_k(1,i);
     mk_minus_1(2,i) = 0;
     mk_minus_1(3,i) = 0;
+
 
     //store pre-determined weight into wk (from matlab)
     wk_minus_1(i) = .0016;
@@ -482,8 +502,6 @@ void PhdFilter::initialize()
     //store pre-determined weight into Pk (from paper)
     Pk_minus_1.block<4,4>(0,i*4) = P_k_init;
   }
-
-
 
   F << 1,0,1,0,
       0,1,0,1,

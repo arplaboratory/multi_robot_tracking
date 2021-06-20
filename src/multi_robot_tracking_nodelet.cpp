@@ -14,15 +14,13 @@
 #include <nav_msgs/Odometry.h>
 #include <tf/transform_datatypes.h>
 
-//detection bbox
-#include <darknet_ros_msgs/BoundingBoxes.h>
-#include <darknet_ros_msgs/BoundingBox.h>
-
 //phd filter class
 #include <multi_robot_tracking/PhdFilter.h>
 
 //jpdaf filter class
 #include <multi_robot_tracking/JpdafFilter.h>
+
+
 
 using namespace std;
 
@@ -37,19 +35,26 @@ class multi_robot_tracking_Nodelet : public nodelet::Nodelet
   //callback functions
   void detection_Callback(const geometry_msgs::PoseArray& in_PoseArray); //bbox to track
   void image_Callback(const sensor_msgs::ImageConstPtr &img_msg); //rgb raw
-  void detection_real_Callback(const darknet_ros_msgs::BoundingBoxes& in_PoseArray); //bbox to track
+  void imu_Callback(const sensor_msgs::ImuConstPtr &imu_msg); //rgb raw
   void image_real_Callback(const sensor_msgs::ImageConstPtr &img_msg); //detected rgb
   void image_realResized_Callback(const sensor_msgs::ImageConstPtr &img_msg); //rgb resized
   void vicon_glass_Callback(const nav_msgs::Odometry::ConstPtr &odom_msg); //vicon 3D ground truth glasses
   void vicon_drone1_Callback(const nav_msgs::Odometry::ConstPtr &odom_msg); //vicon 3D ground truth drone
   void vicon_drone2_Callback(const nav_msgs::Odometry::ConstPtr &odom_msg); //vicon 3D ground truth drone
   void vicon_drone5_Callback(const nav_msgs::Odometry::ConstPtr &odom_msg); //vicon 3D ground truth drone
+  Eigen::MatrixXf get_B_ang_vel_matrix(float x, float y); //return B matrix for each measurement
+
 
   //extra helper functions
   void draw_image();
   void init_matrices();
 
   std::string filter_to_use_; //choose between phd or jpdaf
+  std::string input_bbox_topic; //choose between /hummingbird1/track/bounding_box or /image_processor/objects_center
+  std::string input_img_topic; //choose between /hummingbird1/track/bounding_box or /image_processor/objects_center
+  std::string input_imu_topic;
+  int num_drones;
+
 
   //filters initialize
   PhdFilter phd_filter_;
@@ -62,6 +67,7 @@ class multi_robot_tracking_Nodelet : public nodelet::Nodelet
 
   ros::Subscriber detection_sub_;
   ros::Subscriber image_sub_;
+  ros::Subscriber imu_sub_;
   ros::Subscriber detection_real_sub_;
   ros::Subscriber image_real_sub_;
   ros::Subscriber image_realResized_sub_;
@@ -73,6 +79,7 @@ class multi_robot_tracking_Nodelet : public nodelet::Nodelet
   //output RGB data
   cv::Mat input_image;
   sensor_msgs::ImagePtr image_msg;
+  sensor_msgs::Imu imu_;
 
   //3D matrices for transform
   Eigen::MatrixXf droneA_3Dpose4x1;
@@ -92,6 +99,10 @@ class multi_robot_tracking_Nodelet : public nodelet::Nodelet
 
   ros::Time syncTime;
 
+  //B matrix constants for ang velocity
+  float cx, cy, f;
+
+
 
 };
 
@@ -108,19 +119,24 @@ void multi_robot_tracking_Nodelet::init_matrices()
   vicon_projectedA_2Dpose3x1 = Eigen::MatrixXf(3,1);
   vicon_projectedB_2Dpose3x1 = Eigen::MatrixXf(3,1);
   vicon_projectedC_2Dpose3x1 = Eigen::MatrixXf(3,1);
-  vicon_projected_2DposeArray = Eigen::MatrixXf(3,NUM_DRONES);
+  vicon_projected_2DposeArray = Eigen::MatrixXf(3,num_drones);
 
   Hmatfiller1x4 = Eigen::MatrixXf(1,4);
   rotm_world2cam = Eigen::MatrixXf(3,3);
   rotm_glassesOffset = Eigen::MatrixXf(3,3);
 
-  /* [559 0 490] from maxim's masters thesis.
+  /* [559 0 490] from tobii glass maxim's masters thesis.
    * [0 558 273]
    * [0   0   1]
    */
 
-  k_matrix3x3(0,0) = 559; k_matrix3x3(0,1) = 0;   k_matrix3x3(0,2) = 480;
-  k_matrix3x3(1,0) = 0;   k_matrix3x3(1,1) = 558; k_matrix3x3(1,2) = 270;
+  /* [431 0 329] from snapdragon_pro board2.
+   * [0 431 243]
+   * [0   0   1]
+   */
+
+  k_matrix3x3(0,0) = 559; k_matrix3x3(0,1) = 0;   k_matrix3x3(0,2) = 490;
+  k_matrix3x3(1,0) = 0;   k_matrix3x3(1,1) = 558; k_matrix3x3(1,2) = 273;
   k_matrix3x3(2,0) = 0;   k_matrix3x3(2,1) = 0;   k_matrix3x3(2,2) = 1;
 
   // [ 0 0 0 1 ]
@@ -135,7 +151,9 @@ void multi_robot_tracking_Nodelet::init_matrices()
   rotm_world2cam(2,0) = 1;   rotm_world2cam(2,1) = 0;   rotm_world2cam(2,2) =  0;
 
 
-
+  cx = 329;
+  cy = 243;
+  f = 431;
 
 
 }
@@ -146,14 +164,46 @@ void multi_robot_tracking_Nodelet::init_matrices()
  */
 void multi_robot_tracking_Nodelet::draw_image()
 {
-//  ROS_INFO("drawing estimation");
-  for(int k=0; k < phd_filter_.X_k.cols(); k++)
-  {
-    cv::Point2f target_center(phd_filter_.X_k(0,k),phd_filter_.X_k(1,k));
-    cv::Point2f id_pos(phd_filter_.X_k(0,k),phd_filter_.X_k(1,k)+10);
-    cv::circle(input_image,target_center,4, cv::Scalar(0, 210, 255), 2);
-    putText(input_image, to_string(k), id_pos, cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0, cvScalar(0, 255, 0), 2, CV_AA);//size 1.5 --> 0.5
-  }
+
+    if(filter_to_use_.compare("jpdaf") == 0)
+    {
+//          ROS_INFO("drawing jpdaf estimation");
+          for(int k=0; k < jpdaf_filter_.tracks_.size(); k++)
+          {
+            Eigen::Vector2f temp_center;
+            temp_center = jpdaf_filter_.tracks_[k].get_z();
+
+            cv::Point2f target_center(temp_center(0), temp_center(1));
+            cv::Point2f id_pos(temp_center(0),temp_center(1)+10);
+            cv::circle(input_image,target_center,4, cv::Scalar(0, 210, 255), 2);
+            putText(input_image, to_string(k), id_pos, cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0, cvScalar(0, 255, 0), 2, cv::LINE_AA);//size 1.5 --> 0.5
+
+            //draw cross
+            cv::Point2f det_cross_a(temp_center(0)-5, temp_center(1)-5);
+            cv::Point2f det_cross_b(temp_center(0)+5, temp_center(1)-5);
+            cv::Point2f det_cross_c(temp_center(0)-5, temp_center(1)+5);
+            cv::Point2f det_cross_d(temp_center(0)+5, temp_center(1)+5);
+            line(input_image, det_cross_a, det_cross_d, cv::Scalar(255, 20, 150), 1, 1 );
+            line(input_image, det_cross_b, det_cross_c, cv::Scalar(255, 20, 150), 1, 1 );
+          }
+
+
+    }
+
+    else {
+//          ROS_INFO("drawing phd estimation");
+          for(int k=0; k < phd_filter_.X_k.cols(); k++)
+          {
+            cv::Point2f target_center(phd_filter_.X_k(0,k),phd_filter_.X_k(1,k));
+            cv::Point2f id_pos(phd_filter_.X_k(0,k),phd_filter_.X_k(1,k)+10);
+            cv::circle(input_image,target_center,4, cv::Scalar(0, 210, 255), 2);
+            putText(input_image, to_string(k), id_pos, cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0, cvScalar(0, 255, 0), 2, cv::LINE_AA);//size 1.5 --> 0.5
+          }
+    }
+
+
+
+
 
 //  ROS_INFO("drawing ground truth");
 //  for(int k=0; k < vicon_projected_2DposeArray.cols(); k++)
@@ -176,9 +226,26 @@ void multi_robot_tracking_Nodelet::draw_image()
  */
 void multi_robot_tracking_Nodelet::image_Callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
+  //ROS_WARN("img time: %f",img_msg->header.stamp.toSec());
 //  ROS_INFO("image cb");
   cv_bridge::CvImageConstPtr im_ptr_ = cv_bridge::toCvShare(img_msg, "rgb8");
   input_image = im_ptr_->image;
+
+  draw_image();
+}
+
+/* callback for imu to store for faster motion prediction
+ * input: IMU Image
+ * output: N/A
+ */
+void multi_robot_tracking_Nodelet::imu_Callback(const sensor_msgs::ImuConstPtr &imu_msg)
+{
+//  ROS_WARN("imu time: %f",imu_msg.header.stamp.toSec());
+
+    imu_.header = imu_msg->header;
+    imu_.angular_velocity = imu_msg->angular_velocity;
+
+
 
 }
 
@@ -283,7 +350,7 @@ void multi_robot_tracking_Nodelet::vicon_glass_Callback(const nav_msgs::Odometry
   vicon_projected_2DposeArray.block<3,1>(0,2) = vicon_projectedC_2Dpose3x1;
 
   //offset Y for vicon to glass error
-  for(int i =0; i< NUM_DRONES; i++)
+  for(int i =0; i< num_drones; i++)
   {
     vicon_projected_2DposeArray(1,i) = vicon_projected_2DposeArray(1,i) - 180; //1/3 of the height offset?
   }
@@ -304,6 +371,20 @@ void multi_robot_tracking_Nodelet::vicon_glass_Callback(const nav_msgs::Odometry
   pose_glass2drone_pub_.publish(test_pose);
   pose_glass2drone_proj_pub_.publish(test_proj_pose);
   */
+
+}
+
+Eigen::MatrixXf multi_robot_tracking_Nodelet::get_B_ang_vel_matrix(float x, float y)
+{
+    Eigen::MatrixXf temp_B_matrix;
+    temp_B_matrix = Eigen::MatrixXf::Zero(4,3);
+
+    temp_B_matrix(0,0) = (x-cx)*(y-cy)/f;       temp_B_matrix(0,1) = -(pow((x-cx),2)/f)-f;  temp_B_matrix(0,2) = (y-cy);
+    temp_B_matrix(1,0) = f+(pow((y-cy),2))/f;   temp_B_matrix(1,1) = (x-cx)*(y-cy)/f;       temp_B_matrix(1,2) = -x+cx;
+    temp_B_matrix(2,0) = 0;                     temp_B_matrix(2,1) = 0;                     temp_B_matrix(2,2) = 0;
+    temp_B_matrix(3,0) = 0;                     temp_B_matrix(3,1) = 0;                     temp_B_matrix(3,2) = 0;
+
+    return temp_B_matrix;
 
 }
 
@@ -359,6 +440,7 @@ void multi_robot_tracking_Nodelet::vicon_drone5_Callback(const nav_msgs::Odometr
  */
 void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseArray& in_PoseArray)
 {
+//  ROS_WARN("bbox time: %f",in_PoseArray.header.stamp.toSec());
   ROS_INFO("detected size: %lu ", in_PoseArray.poses.size() );
   jpdaf_filter_.last_timestamp_synchronized = in_PoseArray.header.stamp.toSec();
 
@@ -372,6 +454,9 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
 
     //store Z
     jpdaf_filter_.flightmare_bounding_boxes_msgs_buffer_.push_back(in_PoseArray);
+    //store imu
+    jpdaf_filter_.imu_buffer_.push_back(imu_);
+
 //    jpdaf_filter_.Z_k = Eigen::MatrixXf::Zero(4,jpdaf_filter_.detected_size_k);
 
 //    for(int i =0; i < jpdaf_filter_.detected_size_k; i++)
@@ -386,70 +471,57 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
   //========= use phd filter ===========
   else
   {
+
+    if(phd_filter_.first_callback)
+    {
+      phd_filter_.set_num_drones(num_drones);
+      phd_filter_.initialize_matrix();
+    }
+
+
     phd_filter_.detected_size_k = in_PoseArray.poses.size();
     phd_filter_.Z_k = Eigen::MatrixXf::Zero(4,phd_filter_.detected_size_k);
 
+    phd_filter_.B = Eigen::MatrixXf::Zero(4,3*phd_filter_.detected_size_k);
+
     for(int i =0; i < phd_filter_.detected_size_k; i++)
     {
+        //store Z
       phd_filter_.Z_k(0,i) = in_PoseArray.poses[i].position.x;
       phd_filter_.Z_k(1,i) = in_PoseArray.poses[i].position.y;
+
+      //store B matrix for ang velocity
+      phd_filter_.B.block<4,3>(0,3*i) = get_B_ang_vel_matrix(phd_filter_.Z_k(0,i),phd_filter_.Z_k(1,i));
+
     }
 
-    cout << "Z_k: " << endl << phd_filter_.Z_k << endl;
+    phd_filter_.ang_vel_k(0) = imu_.angular_velocity.x;
+    phd_filter_.ang_vel_k(1) = imu_.angular_velocity.y;
+    phd_filter_.ang_vel_k(2) = imu_.angular_velocity.z;
+
+    //cout << "Z_k_CB: " << endl << phd_filter_.Z_k << endl;
+    //cout << "ang_vel_CB: " << endl << phd_filter_.ang_vel_k << endl;
+
+    //apply rotation from imu2cam frame
+    phd_filter_.ang_vel_k.block<3,1>(0,0) = rotm_world2cam *  phd_filter_.ang_vel_k;
+
+    //cout << "ang_vel_CB after rot: " << endl << phd_filter_.ang_vel_k << endl;
+
 
 
     if(phd_filter_.first_callback)
     {
-
       phd_filter_.initialize();
       phd_filter_.first_callback = false;
-
     }
 
     else {
       phd_filter_.phd_track();
-      draw_image();
+
     }
   }
 }
 
-/* callback for 2D image to call phd track when using flightmare rosbag data
- * input: PoseArray
- * output: N/A
- */
-void multi_robot_tracking_Nodelet::detection_real_Callback(const darknet_ros_msgs::BoundingBoxes& in_PoseArray)
-{
-  ROS_INFO("detected size: %lu ", in_PoseArray.bounding_boxes.size() );
-  //store Z
-  phd_filter_.detected_size_k = in_PoseArray.bounding_boxes.size();
-  phd_filter_.Z_k = Eigen::MatrixXf::Zero(4,phd_filter_.detected_size_k);
-
-  for(int i =0; i < phd_filter_.detected_size_k; i++)
-  {
-    phd_filter_.Z_k(0,i) = int((in_PoseArray.bounding_boxes[i].xmin+in_PoseArray.bounding_boxes[i].xmax)/2);
-    phd_filter_.Z_k(1,i) =  int((in_PoseArray.bounding_boxes[i].ymin+in_PoseArray.bounding_boxes[i].ymax)/2);
-  }
-
-  cout << "Z_k: " << endl << phd_filter_.Z_k << endl;
-
-
-  if(phd_filter_.first_callback)
-  {
-
-    phd_filter_.initialize();
-    phd_filter_.first_callback = false;
-
-  }
-
-  else {
-    phd_filter_.phd_track();
-    draw_image();
-
-  }
-
-
-
-}
 /* Nodelet init function to handle subscribe/publish
  * input: N/A
  * output: N/A
@@ -462,12 +534,17 @@ void multi_robot_tracking_Nodelet::onInit(void)
   image_transport::ImageTransport it(nh);
 
   priv_nh.param<std::string>("filter",filter_to_use_,"phd"); //store which filter to use
+  priv_nh.param<std::string>("input_bbox_topic",input_bbox_topic,"/image_processor/objects_center"); //input bbox topic
+  priv_nh.param<std::string>("input_img_topic",input_img_topic,"/stereo/left/image_raw"); //input img topic
+  priv_nh.param<std::string>("input_imu_topic",input_imu_topic,"/hummingbird0/imu"); //input imu topic
+
+  priv_nh.param<int>("num_drones",num_drones,2);
 
 
   if(filter_to_use_.compare("phd") == 0) //using phd
   {
     ROS_WARN("will be using: %s", filter_to_use_.c_str());
-    //init_matrices(); //initialize matrix for storing 3D pose
+    init_matrices(); //initialize matrix for storing 3D pose
 
   }
 
@@ -480,15 +557,12 @@ void multi_robot_tracking_Nodelet::onInit(void)
     return;
   }
 
-
-  //When using simulation data
-  detection_sub_ = priv_nh.subscribe("/hummingbird1/track/bounding_box", 10, &multi_robot_tracking_Nodelet::detection_Callback, this);
-//  image_sub_ = priv_nh.subscribe("/hummingbird1/camera/rgb", 10, &multi_robot_tracking_Nodelet::image_Callback, this);
-
-  //When using real data
-//  detection_real_sub_ = priv_nh.subscribe("/darknet_ros/bounding_boxes", 10, &multi_robot_tracking_Nodelet::detection_real_Callback, this);
-  image_real_sub_ = priv_nh.subscribe("/darknet_ros/detection_image", 10, &multi_robot_tracking_Nodelet::image_real_Callback, this);
-//  image_realResized_sub_ = priv_nh.subscribe("/gaze/image_resized", 10, &multi_robot_tracking_Nodelet::image_realResized_Callback, this);
+  //bbox subscription of PoseArray Type
+  detection_sub_ = priv_nh.subscribe(input_bbox_topic, 10, &multi_robot_tracking_Nodelet::detection_Callback, this);
+  //img subscription
+  image_sub_ = priv_nh.subscribe(input_img_topic, 10, &multi_robot_tracking_Nodelet::image_Callback, this);
+  //imu subscription
+  imu_sub_ = priv_nh.subscribe(input_imu_topic, 10, &multi_robot_tracking_Nodelet::imu_Callback, this);
 
 //  vicon_glass_sub_ = priv_nh.subscribe("/vicon/TobiiGlasses/odom", 10, &multi_robot_tracking_Nodelet::vicon_glass_Callback, this);
 //  vicon_droneA_sub_ = priv_nh.subscribe("/vicon/DragonFly1/odom", 10, &multi_robot_tracking_Nodelet::vicon_drone1_Callback, this);

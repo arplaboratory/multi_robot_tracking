@@ -12,24 +12,24 @@ using namespace std;
   class TrackerParam
   {
     public:
-      float pd;
-      float gamma;
-      double false_measurements_density;
-      double beta_0_threshold;
-      double alpha_0_threshold;
-      int max_missed_rate;
-      int min_acceptance_rate;
+      float pd = 0.952662721893;
+      float gamma = 10;
+      double false_measurements_density = 0.00000003034;
+      double beta_0_threshold = 0.5;
+      double alpha_0_threshold = 0.95;
+      int max_missed_rate = 15;
+      int min_acceptance_rate = 15;
       Eigen::Matrix2f R;
       //Eigen::Matrix2f T;
       Eigen::Vector2f T;
       Eigen::Matrix4f P_0;
-      int nb_drones;
-      float assoc_cost;
+      int nb_drones = 3;
+      float assoc_cost = 50;
 
-      float max_update_time_rate;
+      float max_update_time_rate = 0.1;
 
-      float focal_length;
-      float alpha_cam; //pixel size ratio
+      float focal_length = 564.26;
+      float alpha_cam = 1.0; //pixel size ratio
       Eigen::Vector2f principal_point;
 
       string gt_topic_name;
@@ -38,6 +38,7 @@ using namespace std;
 
       string root_;
       string output_file_name_;
+
 
 
       TrackerParam(ros::NodeHandle nh_priv_);

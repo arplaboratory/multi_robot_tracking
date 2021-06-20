@@ -1,6 +1,5 @@
 #include <Eigen/Geometry>
 #include <Eigen/Dense>
-#include <eigen_conversions/eigen_msg.h>
 #include <math.h>
 
 //ros
@@ -28,7 +27,7 @@
 
 
 #define PI 3.14159
-#define NUM_DRONES 3
+
 
 
 class JpdafFilter
