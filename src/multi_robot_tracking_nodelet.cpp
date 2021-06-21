@@ -55,6 +55,18 @@ class multi_robot_tracking_Nodelet : public nodelet::Nodelet
   std::string input_imu_topic;
   int num_drones;
 
+  ros::Time img_timestamp;
+  ros::Time prev_img_timestamp;
+  ros::Time bbox_timestamp;
+  ros::Time imu_timestamp;
+  double previous_timestamp = 0;         //t-1
+  double current_timestamp = 0;          //t
+  double delta_timestamp = 0;                //dt
+  double imu_time = 0;
+
+  std::vector<sensor_msgs::ImageConstPtr> image_buffer_;
+  std::vector<sensor_msgs::Imu> sensor_imu_buffer_;
+
 
   //filters initialize
   PhdFilter phd_filter_;
@@ -78,6 +90,7 @@ class multi_robot_tracking_Nodelet : public nodelet::Nodelet
 
   //output RGB data
   cv::Mat input_image;
+  cv::Mat previous_image;
   sensor_msgs::ImagePtr image_msg;
   sensor_msgs::Imu imu_;
 
@@ -97,7 +110,6 @@ class multi_robot_tracking_Nodelet : public nodelet::Nodelet
 
   Eigen::MatrixXf vicon_projected_2DposeArray;
 
-  ros::Time syncTime;
 
   //B matrix constants for ang velocity
   float cx, cy, f;
@@ -175,16 +187,16 @@ void multi_robot_tracking_Nodelet::draw_image()
 
             cv::Point2f target_center(temp_center(0), temp_center(1));
             cv::Point2f id_pos(temp_center(0),temp_center(1)+10);
-            cv::circle(input_image,target_center,4, cv::Scalar(0, 210, 255), 2);
-            putText(input_image, to_string(k), id_pos, cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0, cvScalar(0, 255, 0), 2, cv::LINE_AA);//size 1.5 --> 0.5
+            cv::circle(previous_image,target_center,4, cv::Scalar(0, 210, 255), 2);
+            putText(previous_image, to_string(k), id_pos, cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0, cvScalar(0, 255, 0), 2, cv::LINE_AA);//size 1.5 --> 0.5
 
             //draw cross
             cv::Point2f det_cross_a(temp_center(0)-5, temp_center(1)-5);
             cv::Point2f det_cross_b(temp_center(0)+5, temp_center(1)-5);
             cv::Point2f det_cross_c(temp_center(0)-5, temp_center(1)+5);
             cv::Point2f det_cross_d(temp_center(0)+5, temp_center(1)+5);
-            line(input_image, det_cross_a, det_cross_d, cv::Scalar(255, 20, 150), 1, 1 );
-            line(input_image, det_cross_b, det_cross_c, cv::Scalar(255, 20, 150), 1, 1 );
+            line(previous_image, det_cross_a, det_cross_d, cv::Scalar(255, 20, 150), 1, 1 );
+            line(previous_image, det_cross_b, det_cross_c, cv::Scalar(255, 20, 150), 1, 1 );
           }
 
 
@@ -196,8 +208,8 @@ void multi_robot_tracking_Nodelet::draw_image()
           {
             cv::Point2f target_center(phd_filter_.X_k(0,k),phd_filter_.X_k(1,k));
             cv::Point2f id_pos(phd_filter_.X_k(0,k),phd_filter_.X_k(1,k)+10);
-            cv::circle(input_image,target_center,4, cv::Scalar(0, 210, 255), 2);
-            putText(input_image, to_string(k), id_pos, cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0, cvScalar(0, 255, 0), 2, cv::LINE_AA);//size 1.5 --> 0.5
+            cv::circle(previous_image,target_center,4, cv::Scalar(0, 210, 255), 2);
+            putText(previous_image, to_string(k), id_pos, cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0, cvScalar(0, 255, 0), 2, cv::LINE_AA);//size 1.5 --> 0.5
           }
     }
 
@@ -210,9 +222,12 @@ void multi_robot_tracking_Nodelet::draw_image()
 //    putText(input_image, to_string(k), id_pos, cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0, cvScalar(0, 255, 0), 2, CV_AA);//size 1.5 --> 0.5
 //  }
 
-  image_msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", input_image).toImageMsg();
-  image_msg->header.stamp = syncTime;
+  image_msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", previous_image).toImageMsg();
+  image_msg->header.stamp = prev_img_timestamp;
   image_pub_.publish(image_msg);
+
+//  ROS_WARN("img time: %f",prev_img_timestamp.toSec());
+//  ROS_WARN("bbox time: %f",bbox_timestamp.toSec());
 
 }
 
@@ -222,12 +237,17 @@ void multi_robot_tracking_Nodelet::draw_image()
  */
 void multi_robot_tracking_Nodelet::image_Callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
-  //ROS_WARN("img time: %f",img_msg->header.stamp.toSec());
-//  ROS_INFO("image cb");
-  cv_bridge::CvImageConstPtr im_ptr_ = cv_bridge::toCvShare(img_msg, "rgb8");
-  input_image = im_ptr_->image;
 
-  draw_image();
+
+    img_timestamp = img_msg->header.stamp;
+    cv_bridge::CvImageConstPtr im_ptr_ = cv_bridge::toCvShare(img_msg, "rgb8");
+    input_image = im_ptr_->image;
+
+    draw_image();
+
+    prev_img_timestamp = img_msg->header.stamp;
+    cv_bridge::CvImageConstPtr prev_im_ptr_ = cv_bridge::toCvShare(img_msg, "rgb8");
+    previous_image = prev_im_ptr_->image;
 }
 
 /* callback for imu to store for faster motion prediction
@@ -236,13 +256,12 @@ void multi_robot_tracking_Nodelet::image_Callback(const sensor_msgs::ImageConstP
  */
 void multi_robot_tracking_Nodelet::imu_Callback(const sensor_msgs::ImuConstPtr &imu_msg)
 {
-//  ROS_WARN("imu time: %f",imu_msg.header.stamp.toSec());
+    if(sensor_imu_buffer_.size() < 5)
+    sensor_imu_buffer_.push_back(*imu_msg);
 
-    imu_.header = imu_msg->header;
-    imu_.angular_velocity = imu_msg->angular_velocity;
-
-
-
+    else {
+        sensor_imu_buffer_.erase(sensor_imu_buffer_.begin());
+    }
 }
 
 void multi_robot_tracking_Nodelet::image_real_Callback(const sensor_msgs::ImageConstPtr &img_msg)
@@ -273,8 +292,8 @@ void multi_robot_tracking_Nodelet::image_realResized_Callback(const sensor_msgs:
 void multi_robot_tracking_Nodelet::vicon_glass_Callback(const nav_msgs::Odometry::ConstPtr &odom_msg)
 {
 
-  ROS_WARN("--odom time:%d",odom_msg->header.stamp.sec );
-  syncTime = odom_msg->header.stamp;
+//  ROS_WARN("--odom time:%d",odom_msg->header.stamp.sec );
+//  syncTime = odom_msg->header.stamp;
 
 //  ROS_INFO("glass cb");
   //translation
@@ -380,6 +399,7 @@ Eigen::MatrixXf multi_robot_tracking_Nodelet::get_B_ang_vel_matrix(float x, floa
     temp_B_matrix(2,0) = 0;                     temp_B_matrix(2,1) = 0;                     temp_B_matrix(2,2) = 0;
     temp_B_matrix(3,0) = 0;                     temp_B_matrix(3,1) = 0;                     temp_B_matrix(3,2) = 0;
 
+    temp_B_matrix = temp_B_matrix * delta_timestamp;
     return temp_B_matrix;
 
 }
@@ -436,7 +456,20 @@ void multi_robot_tracking_Nodelet::vicon_drone5_Callback(const nav_msgs::Odometr
  */
 void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseArray& in_PoseArray)
 {
-//  ROS_WARN("bbox time: %f",in_PoseArray.header.stamp.toSec());
+    //get time of detection
+  bbox_timestamp = in_PoseArray.header.stamp;
+  current_timestamp = bbox_timestamp.toSec();
+
+  //use imu buffer
+  sensor_msgs::Imu prevImu = sensor_imu_buffer_[0];
+  imu_timestamp = prevImu.header.stamp;
+  imu_time = imu_timestamp.toSec();
+  ROS_WARN("bbox time: %f, dt: %f, imu time: %f",current_timestamp, delta_timestamp, imu_time);
+
+
+  imu_.header = prevImu.header;
+  imu_.angular_velocity = prevImu.angular_velocity;
+
   ROS_INFO("detected size: %lu ", in_PoseArray.poses.size() );
   jpdaf_filter_.last_timestamp_synchronized = in_PoseArray.header.stamp.toSec();
 
@@ -499,7 +532,7 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
     //cout << "ang_vel_CB: " << endl << phd_filter_.ang_vel_k << endl;
 
     //apply rotation from imu2cam frame
-    phd_filter_.ang_vel_k.block<3,1>(0,0) = rotm_world2cam *  phd_filter_.ang_vel_k;
+    phd_filter_.ang_vel_k.block<3,1>(0,0) = rotm_world2cam *  phd_filter_.ang_vel_k * delta_timestamp;
 
     //cout << "ang_vel_CB after rot: " << endl << phd_filter_.ang_vel_k << endl;
 
@@ -507,15 +540,33 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
 
     if(phd_filter_.first_callback)
     {
+        //check for data with no timestamp and thus dt = 0
+        if(delta_timestamp == 0)
+            delta_timestamp = 0.125;
+        phd_filter_.dt = delta_timestamp;
+
       phd_filter_.initialize();
       phd_filter_.first_callback = false;
+
+      delta_timestamp = 0.125;
+      previous_timestamp = current_timestamp;
     }
 
     else {
       phd_filter_.phd_track();
 
+      delta_timestamp = current_timestamp - previous_timestamp;
+      //check for data with no timestamp and thus dt = 0
+      if(delta_timestamp == 0)
+          delta_timestamp = 0.125;
+      phd_filter_.dt = delta_timestamp;
+      previous_timestamp = current_timestamp;
+
     }
   }
+
+
+
 }
 
 /* Nodelet init function to handle subscribe/publish

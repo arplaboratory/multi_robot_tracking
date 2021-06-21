@@ -32,7 +32,7 @@ void PhdFilter::phd_track()
   //draw_image();
 
   endTime = ros::Time::now();
-  ROS_WARN("total plan time: %f [sec]", (endTime - startTime).toSec());
+//  ROS_WARN("total plan time: %f [sec]", (endTime - startTime).toSec());
 
 }
 
@@ -113,13 +113,11 @@ void PhdFilter::initialize()
     Pk_minus_1.block<4,4>(0,i*4) = P_k_init;
   }
 
-  F << 1,0,1,0,
-      0,1,0,1,
+  F << 1,0,dt,0,
+      0,1,0,dt,
       0,0,1,0,
       0,0,0,1;
 
-  int dt =1;
-  int sigma_v = 5;
   //Q = sigma_v^2 * [ [1/4*dt^4*I2, 1/2*dt^3*I2]; [1/2*dt^3* I2, dt^2*I2] ]; %Process noise covariance, given in Vo&Ma.
 
   Q << 6.25, 0, 12.5, 0,
@@ -144,12 +142,20 @@ void PhdFilter::phd_predict_existing()
 
   wk_minus_1 = prob_survival * wk_minus_1;
 
+//  cout << "B: " << B << endl;
+//  cout << "u: " << ang_vel_k << endl;
+
+  Eigen::MatrixXf ang_vel_temp;
+  ang_vel_temp = Eigen::MatrixXf::Zero(4,3);
 
   for (int i = 0; i < mk_minus_1.cols(); i++)
   {
       //cout << "i: " << i << endl;
 
-      mk_minus_1.block<4,1>(0,i) = F * mk_minus_1.block<4,1>(0,i); // + B.block<4,3>(0,3*i) * ang_vel_k;
+      ang_vel_temp= B.block<4,3>(0,3*i) * ang_vel_k * 0.1; //scale down
+//      cout << "Bu: " << endl << ang_vel_temp << endl;
+      // Ax + Bu
+      mk_minus_1.block<4,1>(0,i) = F * mk_minus_1.block<4,1>(0,i) + ang_vel_temp;
   }
 
   Eigen::MatrixXf P_temp;
@@ -336,7 +342,7 @@ void PhdFilter::phd_prune()
   //find weights threshold
   for(int i = 0; i < wk.cols(); i ++)
   {
-    if(wk(i) > 0.00005)
+    if(wk(i) > 0.00000005)
     {
       index_counter++;
       I.conservativeResize(1,index_counter);
@@ -522,11 +528,16 @@ void PhdFilter::phd_state_extract()
   mk_minus_1 = mk_bar_fixed;
   Pk_minus_1 = Pk_bar_fixed.cwiseAbs();
 
-  for (int i = 0; i < wk_bar_fixed.cols(); i++)
+  if (k_iteration > 3)
   {
-      velocity = (mk_minus_1.block<2,1>(0,i) - mk_k_minus_1_beforePrediction.block<2,1>(0,i))/ 1 ; //TODO replace dt=1
-      mk_minus_1.block<2,1>(2,i) = velocity;
+      for (int i = 0; i < wk_bar_fixed.cols(); i++)
+      {
+          velocity = (mk_minus_1.block<2,1>(0,i) - mk_k_minus_1_beforePrediction.block<2,1>(0,i))/ dt ;
+          mk_minus_1.block<2,1>(2,i) = velocity;
+      }
+
   }
+
 
   X_k = mk_minus_1;
   cout << "--- X_k: " << endl << X_k << endl;

@@ -73,6 +73,8 @@ class PhdFilter
   float prob_survival = 1.0;
   float prob_detection = 1.0;
 
+  float dt = 0;
+
   Eigen::MatrixXf mk_minus_1;
   Eigen::MatrixXf wk_minus_1;
   Eigen::MatrixXf Pk_minus_1;
