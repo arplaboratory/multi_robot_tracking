@@ -201,10 +201,6 @@ void multi_robot_tracking_Nodelet::draw_image()
           }
     }
 
-
-
-
-
 //  ROS_INFO("drawing ground truth");
 //  for(int k=0; k < vicon_projected_2DposeArray.cols(); k++)
 //  {
@@ -499,7 +495,7 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
     phd_filter_.ang_vel_k(1) = imu_.angular_velocity.y;
     phd_filter_.ang_vel_k(2) = imu_.angular_velocity.z;
 
-    //cout << "Z_k_CB: " << endl << phd_filter_.Z_k << endl;
+    cout << "Z_k_CB: " << endl << phd_filter_.Z_k << endl;
     //cout << "ang_vel_CB: " << endl << phd_filter_.ang_vel_k << endl;
 
     //apply rotation from imu2cam frame

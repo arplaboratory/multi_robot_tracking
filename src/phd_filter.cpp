@@ -11,6 +11,32 @@ PhdFilter::PhdFilter()
 
 }
 
+void PhdFilter::phd_track()
+{
+  startTime = ros::Time::now();
+  k_iteration = k_iteration + 1;
+  ROS_INFO("iter: %d",k_iteration);
+
+  //predict existing
+  phd_predict_existing();
+  //construct
+  phd_construct();
+  //update
+  phd_update();
+  //prune
+  phd_prune();
+  //state extraction
+  phd_state_extract();
+
+  //draw track on image
+  //draw_image();
+
+  endTime = ros::Time::now();
+  ROS_WARN("total plan time: %f [sec]", (endTime - startTime).toSec());
+
+}
+
+
 void PhdFilter::initialize_matrix()
 {
     ROS_INFO("first initialize matrix");
@@ -54,29 +80,59 @@ void PhdFilter::initialize_matrix()
   mk_k_minus_1_beforePrediction = Eigen::MatrixXf::Zero(4,NUM_DRONES);
 }
 
-void PhdFilter::phd_track()
+void PhdFilter::set_num_drones(int num_drones_in)
 {
-  startTime = ros::Time::now();
-  k_iteration = k_iteration + 1;
-  ROS_INFO("iter: %d",k_iteration);
+  NUM_DRONES = num_drones_in;
+}
 
-  //predict existing
-  phd_predict_existing();
-  //construct
-  phd_construct();
-  //update
-  phd_update();
-  //prune
-  phd_prune();
-  //state extraction
-  phd_state_extract();
+void PhdFilter::initialize()
+{
+  Eigen::MatrixXf P_k_init;
+  P_k_init = Eigen::MatrixXf(4,4);
+  P_k_init <<
+              10,0,0,0,
+      0,10,0,0,
+      0,0,5,0,
+      0,0,0,5;
 
-  //draw track on image
-  //draw_image();
 
-  endTime = ros::Time::now();
-  ROS_WARN("total plan time: %f [sec]", (endTime - startTime).toSec());
+  for(int i = 0; i < Z_k.cols(); i ++)
+  {
 
+    //store Z into mk (x,y)
+    mk_minus_1(0,i) = Z_k(0,i);
+    mk_minus_1(1,i) = Z_k(1,i);
+    mk_minus_1(2,i) = 0;
+    mk_minus_1(3,i) = 0;
+
+
+    //store pre-determined weight into wk (from matlab)
+    wk_minus_1(i) = .0016;
+
+    //store pre-determined weight into Pk (from paper)
+    Pk_minus_1.block<4,4>(0,i*4) = P_k_init;
+  }
+
+  F << 1,0,1,0,
+      0,1,0,1,
+      0,0,1,0,
+      0,0,0,1;
+
+  int dt =1;
+  int sigma_v = 5;
+  //Q = sigma_v^2 * [ [1/4*dt^4*I2, 1/2*dt^3*I2]; [1/2*dt^3* I2, dt^2*I2] ]; %Process noise covariance, given in Vo&Ma.
+
+  Q << 6.25, 0, 12.5, 0,
+      0, 6.25, 0, 12.5,
+      12.5, 0, 25, 0,
+      0, 12.5, 0, 25;
+
+  R << 100,0,0,0,
+      0,100,0,0,
+      0,0,100,0,
+      0,0,0,100;
+
+  numTargets_Jk_minus_1 = NUM_DRONES;
 }
 
 void PhdFilter::phd_predict_existing()
@@ -299,7 +355,7 @@ void PhdFilter::phd_prune()
 
     float max = I_weights.maxCoeff(&maxRow, &maxCol);
     j = int(I(maxCol));
-    //    cout << "Max w: " << max <<  ", at I_index: " << maxCol << ", w_index: " << j << endl;
+//    cout << "Max w: " << max <<  ", at I_index: " << maxCol << ", w_index: " << j << endl;
 
     //store index
     indexOrder(i) = j;
@@ -312,14 +368,22 @@ void PhdFilter::phd_prune()
 
     //remove index that is same index multiple
     search_index = j%numTargets_Jk_k_minus_1;
+//    cout << "search index:" << search_index <<  endl;
     for (int i =0; i < I.cols(); i++)
     {
+//        cout << "I(i): " << int(I(i)) << " ...I(i)%3: " << int(I(i))%numTargets_Jk_k_minus_1 << endl;
       if( int(I(i))%numTargets_Jk_k_minus_1 == search_index )
       {
 
         //remove this index from I, Iweight
+//        cout << "removing index:" << i << endl;
         removeColumn(I,i);
         removeColumnf(I_weights,i);
+//        cout << "remaining I:" << I << endl;
+
+        //to prevent skipping when [4 7 8 10 11] search index = 1... 4,7 causes to skip
+        i--;
+
       }
     }
 
@@ -453,10 +517,6 @@ void PhdFilter::phd_state_extract()
   Eigen::MatrixXf velocity;
   velocity = Eigen::MatrixXf(2,1);
 
-  X_k = mk_bar_fixed;
-  cout << "--- X_k: " << endl << X_k << endl;
-
-
   //update state for next iterations
   wk_minus_1 = wk_bar_fixed;
   mk_minus_1 = mk_bar_fixed;
@@ -464,66 +524,17 @@ void PhdFilter::phd_state_extract()
 
   for (int i = 0; i < wk_bar_fixed.cols(); i++)
   {
-    velocity = X_k.block<2,1>(0,i) - mk_k_minus_1_beforePrediction.block<2,1>(0,i);
-    mk_minus_1.block<2,1>(2,i) = velocity;
+      velocity = (mk_minus_1.block<2,1>(0,i) - mk_k_minus_1_beforePrediction.block<2,1>(0,i))/ 1 ; //TODO replace dt=1
+      mk_minus_1.block<2,1>(2,i) = velocity;
   }
 
+  X_k = mk_minus_1;
+  cout << "--- X_k: " << endl << X_k << endl;
+
+
 }
 
-void PhdFilter::set_num_drones(int num_drones_in)
-{
-  NUM_DRONES = num_drones_in;
-}
 
-void PhdFilter::initialize()
-{
-  Eigen::MatrixXf P_k_init;
-  P_k_init = Eigen::MatrixXf(4,4);
-  P_k_init <<
-              10,0,0,0,
-      0,10,0,0,
-      0,0,5,0,
-      0,0,0,5;
-
-
-  for(int i = 0; i < Z_k.cols(); i ++)
-  {
-
-    //store Z into mk (x,y)
-    mk_minus_1(0,i) = Z_k(0,i);
-    mk_minus_1(1,i) = Z_k(1,i);
-    mk_minus_1(2,i) = 0;
-    mk_minus_1(3,i) = 0;
-
-
-    //store pre-determined weight into wk (from matlab)
-    wk_minus_1(i) = .0016;
-
-    //store pre-determined weight into Pk (from paper)
-    Pk_minus_1.block<4,4>(0,i*4) = P_k_init;
-  }
-
-  F << 1,0,1,0,
-      0,1,0,1,
-      0,0,1,0,
-      0,0,0,1;
-
-  int dt =1;
-  int sigma_v = 5;
-  //Q = sigma_v^2 * [ [1/4*dt^4*I2, 1/2*dt^3*I2]; [1/2*dt^3* I2, dt^2*I2] ]; %Process noise covariance, given in Vo&Ma.
-
-  Q << 6.25, 0, 12.5, 0,
-      0, 6.25, 0, 12.5,
-      12.5, 0, 25, 0,
-      0, 12.5, 0, 25;
-
-  R << 100,0,0,0,
-      0,100,0,0,
-      0,0,100,0,
-      0,0,0,100;
-
-  numTargets_Jk_minus_1 = NUM_DRONES;
-}
 
 float PhdFilter::clutter_intensity(const float ZmeasureX, const float ZmeasureY)
 {

@@ -1,5 +1,5 @@
 <launch>
-  <arg name="filter" default="jpdaf" /> <!--"phd" or "jpdaf" -->
+  <arg name="filter" default="phd" /> <!--"phd" or "jpdaf" -->
   <arg name="input_bbox_topic" default="/hummingbird0/track/bounding_box" />
   <arg name="input_img_topic" default="/hummingbird0/camera/rgb" />
   <arg name="input_imu_topic" default="/hummingbird0/imu" />
