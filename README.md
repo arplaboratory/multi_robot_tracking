@@ -22,7 +22,7 @@ Maintainer: Mark Lee, ml7617@nyu.edu<br />**
 |Name|Type|Description|
 |---|---|---|
 |`/tracked_image`|sensor_msgs/Image|RGB with position, ID association labeled|
-|`/tracked_pose_output`|geometry_msgs/PoseArray|position with ID association|
+|`/tracked_pose_output`|geometry_msgs/PoseArray|position (x,y) in pixel coordinate with ID association, which is the index array|
 
 
 
