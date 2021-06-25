@@ -31,9 +31,10 @@ Maintainer: Mark Lee, ml7617@nyu.edu<br />**
 |Name|Description|
 |---|---|
 |`filter`|phd or jpdaf specify in the demo.launch file|
+|`input_bbox_topic`|output of py_imag_proc or /hummingbird0/track/bounding_box specify in the demo.launch file|
 |`input_rgb_topic`|/hires/image_raw or hummingbird0/camera/rgb specify in the demo.launch file|
-
-
+|`input_imu_topic`|output of dragonfly imu or hummingbird0/imu specify in the demo.launch file|
+|`num_drones`|how many drones in FOV specify in the demo.launch file|
 
 
 ## Install
