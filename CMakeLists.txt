@@ -14,7 +14,6 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   nav_msgs
   image_transport
-  darknet_ros_msgs
 )
 find_package(Eigen3 REQUIRED NO_MODULE)
 
@@ -28,7 +27,6 @@ catkin_package(
   std_msgs
   tf
   cv_bridge
-  darknet_ros_msgs
   DEPENDS
   EIGEN3
 )

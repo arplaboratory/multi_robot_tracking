@@ -14,32 +14,34 @@ Maintainer: Mark Lee, ml7617@nyu.edu<br />**
 #### Subscribed Topics
 |Name|Type|Description|
 |---|---|---|
-|`/darknet_ros/bounding_boxes`|darknet_ros_msgs/BoundingBoxes|output 2D position from darknet ros pacackage|
-|`/darknet_ros/detection_image`|sensor_msgs/Image|RGB image|
+|`/hummingbird0/track/bounding_box`|geometry_msgs/PoseArray|output 2D position from Flightmare rosbag|
+|`/hummingbird0/camera/rgb`|sensor_msgs/Image|RGB image|
+|`/hummingbird0/imu`|sensor_msgs/Imu|IMU data|position
 
 #### Published Topics
 |Name|Type|Description|
 |---|---|---|
 |`/tracked_image`|sensor_msgs/Image|RGB with position, ID association labeled|
+|`/tracked_pose_output`|geometry_msgs/PoseArray|position (x,y) in pixel coordinate with ID association, which is the index array|
+|`/tracked_velocity_output`|geometry_msgs/PoseArray|linear velocity (x,y) in pixel coordinate with ID association, velocity in pixel space|
+
+
 
 #### ROS Parameters
 |Name|Description|
 |---|---|
 |`filter`|phd or jpdaf specify in the demo.launch file|
+|`input_bbox_topic`|output of py_imag_proc or /hummingbird0/track/bounding_box specify in the demo.launch file|
+|`input_rgb_topic`|/hires/image_raw or hummingbird0/camera/rgb specify in the demo.launch file|
+|`input_imu_topic`|output of dragonfly imu or hummingbird0/imu specify in the demo.launch file|
+|`num_drones`|how many drones in FOV specify in the demo.launch file|
 
 
 ## Install
 The tracking filter package is dependent on Eigen and Boost, and ROS. The additional repo can be installed below:
 
-install darknet ros for 2d bounding box test (older version to be compatiable with rosbag data)
-```
-$ git clone https://github.com/ShiSanChuan/darknet_ros.git
-$ cd ..
-$ catkin_make darknet_ros -DCMAKE_BUILD_TYPE=Release
-$ source devel/setup.bash
-```
 
-install filter repository into catkin directory
+install filter repository into catkin src directory
 ```
 $ git clone https://github.com/arplaboratory/multi_robot_tracking.git
 $ cd ..
@@ -47,7 +49,7 @@ $ catkin_make
 $ source devel/setup.bash
 ```
 
-retrieve rosbag data from [ARPL data folder](https://drive.google.com/drive/folders/1xc6DbgBbhABoLlvGTSrrJ1zFWL4S-ZTt?usp=sharing) after gaining access
+retrieve drone_2d_3drones_imu.bag rosbag data from [ARPL data folder](https://drive.google.com/drive/folders/1xc6DbgBbhABoLlvGTSrrJ1zFWL4S-ZTt?usp=sharing) after gaining access
 
 ## Running
 This pacakge runs the tracking filter only -- it doesn't provide image detection. If image detection package is not available, can run with either by recorded rosbag data or by acquiring ground truth detection from simulation. Boths options are shown below. Specifiy filter rosparam in the demo.launch file to select phd or jpdaf filter. 
@@ -58,13 +60,11 @@ $ roslaunch demo.launch
 ```
 
 A. Testing with recorded Rosbag. </br>
-Move rosbag data into corresponding directory. Modify the rostopic subscriber in multi_robot_tracking_nodelet.cpp if wanting to modify using a different measured input.
+Move rosbag data into corresponding directory. Modify the rostopic subscriber in demo.launch if wanting to modify using a different measured input.
 ```
 $ roscd multi_robot_tracking/launch/
 $ roslaunch demo.launch
 -- open a new tab and navigate to rosbag directory
-$ rosbag play darknet_detection_3drones_VICON_TobiiGlasses.bag 
--- if using a rosbag from flightmare simulator
 $ rosbag play drone_2d_3drones_imu.bag --clock 
 ```
 
