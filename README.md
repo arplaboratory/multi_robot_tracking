@@ -15,8 +15,8 @@ Maintainer: Mark Lee, ml7617@nyu.edu<br />**
 |Name|Type|Description|
 |---|---|---|
 |`/hummingbird0/track/bounding_box'|geometry_msgs/PoseArray|output 2D position from Flightmare rosbag|
-|`/hummingbird0/camera/rgb`|sensor_msgs/Image|RGB image|
-|`/hummingbird0/imu"`|sensor_msgs/Imu|IMU data|
+|`/hummingbird0/camera/rgb'|sensor_msgs/Image|RGB image|
+|`/hummingbird0/imu`|sensor_msgs/Imu|IMU data|
 
 #### Published Topics
 |Name|Type|Description|
@@ -30,6 +30,9 @@ Maintainer: Mark Lee, ml7617@nyu.edu<br />**
 |Name|Description|
 |---|---|
 |`filter`|phd or jpdaf specify in the demo.launch file|
+|`input_rgb_topic`|/hires/image_raw or hummingbird0/camera/rgb specify in the demo.launch file|
+
+
 
 
 ## Install
