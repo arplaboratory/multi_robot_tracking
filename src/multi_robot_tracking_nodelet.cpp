@@ -80,6 +80,7 @@ public:
     ros::Publisher pose_glass2drone_pub_;
     ros::Publisher pose_glass2drone_proj_pub_;
     ros::Publisher tracked_pose_pub_;
+    ros::Publisher tracked_velocity_pub_;
 
     ros::Subscriber detection_sub_;
     ros::Subscriber image_sub_;
@@ -602,8 +603,8 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
 void multi_robot_tracking_Nodelet::publish_tracks()
 {
 
-    geometry_msgs::PoseArray tracked_output_pose;
-    geometry_msgs::Pose temp_pose;
+    geometry_msgs::PoseArray tracked_output_pose, tracked_velocity_pose;
+    geometry_msgs::Pose temp_pose, temp_velocity;
 
     if(filter_to_use_.compare("jpdaf") == 0)
     {
@@ -619,17 +620,27 @@ void multi_robot_tracking_Nodelet::publish_tracks()
             temp_pose.position.x = phd_filter_.X_k(0,i);
             temp_pose.position.y = phd_filter_.X_k(1,i);
             tracked_output_pose.poses.push_back(temp_pose);
+
+            temp_velocity.position.x = phd_filter_.X_k(2,i);
+            temp_velocity.position.y = phd_filter_.X_k(3,i);
+            tracked_velocity_pose.poses.push_back(temp_velocity);
         }
 
     }
 
     //publish output (stored as either jpdaf or phd)
     tracked_output_pose.header.stamp = bbox_timestamp;
+    tracked_velocity_pose.header.stamp = bbox_timestamp;
     tracked_pose_pub_.publish(tracked_output_pose);
+    tracked_velocity_pub_.publish(tracked_velocity_pose);
 
     //empty tracked output
     while(!tracked_output_pose.poses.empty()) {
         tracked_output_pose.poses.pop_back();
+    }
+
+    while(!tracked_velocity_pose.poses.empty()) {
+        tracked_velocity_pose.poses.pop_back();
     }
 
 
@@ -687,6 +698,7 @@ void multi_robot_tracking_Nodelet::onInit(void)
     //  pose_glass2drone_proj_pub_ = priv_nh.advertise<nav_msgs::Odometry>("/test_projected_pose",1);
 
     tracked_pose_pub_ = nh.advertise<geometry_msgs::PoseArray>("tracked_pose_output",1);
+    tracked_velocity_pub_ = nh.advertise<geometry_msgs::PoseArray>("tracked_velocity_output",1);
 
 }
 

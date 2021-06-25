@@ -1,5 +1,6 @@
 <launch>
-  <arg name="filter" default="phd" /> <!--"phd" or "jpdaf" -->
+  <arg name="filter" default="phd" />
+  <!--"phd" or "jpdaf" -->
   <arg name="input_bbox_topic" default="/hummingbird0/track/bounding_box" />
   <arg name="input_img_topic" default="/hummingbird0/camera/rgb" />
   <arg name="input_imu_topic" default="/hummingbird0/imu" />
@@ -7,17 +8,15 @@
   <arg name="start_nodelet_manager" default="true" />
   <arg name="nodelet_manager_name" default="nodelet_manager_multi_tracking" />
   <param name="filter" value="$(arg filter)" />
-  
-
-    <param name="/use_sim_time" value="true" />
-<!-- Related Nodelets-->
+  <param name="/use_sim_time" value="true" />
+  <!-- Related Nodelets-->
   <node pkg="nodelet" type="nodelet" name="$(arg nodelet_manager_name)" args="manager" output="screen" if="$(arg start_nodelet_manager)" />
   <node pkg="nodelet" type="nodelet" args="load multi_robot_tracking/multi_robot_tracking_Nodelet $(arg nodelet_manager_name)" name="multi_tracking" required="true" output="screen">
     <param name="filter" value="$(arg filter)" />
     <param name="input_bbox_topic" value="$(arg input_bbox_topic)" />
     <param name="input_img_topic" value="$(arg input_img_topic)" />
-    <param name="num_drones" value="$(arg num_drones)" /> 
+    <param name="num_drones" value="$(arg num_drones)" />
   </node>
   <!-- RVIZ -->
-       <node pkg="rviz" type="rviz" name="rviz" args="-d $(find multi_robot_tracking)/rviz/darknet_vis.rviz" />
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find multi_robot_tracking)/rviz/darknet_vis.rviz" />
 </launch>
