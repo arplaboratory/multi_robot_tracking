@@ -14,15 +14,16 @@ Maintainer: Mark Lee, ml7617@nyu.edu<br />**
 #### Subscribed Topics
 |Name|Type|Description|
 |---|---|---|
-|`/hummingbird0/track/bounding_box'|geometry_msgs/PoseArray|output 2D position from Flightmare rosbag|
-|`/hummingbird0/camera/rgb'|sensor_msgs/Image|RGB image|
-|`/hummingbird0/imu`|sensor_msgs/Imu|IMU data|
+|`/hummingbird0/track/bounding_box`|geometry_msgs/PoseArray|output 2D position from Flightmare rosbag|
+|`/hummingbird0/camera/rgb`|sensor_msgs/Image|RGB image|
+|`/hummingbird0/imu`|sensor_msgs/Imu|IMU data|position
 
 #### Published Topics
 |Name|Type|Description|
 |---|---|---|
 |`/tracked_image`|sensor_msgs/Image|RGB with position, ID association labeled|
 |`/tracked_pose_output`|geometry_msgs/PoseArray|position (x,y) in pixel coordinate with ID association, which is the index array|
+|`/tracked_velocity_output`|geometry_msgs/PoseArray|linear velocity (x,y) in pixel coordinate with ID association, velocity in pixel space|
 
 
 
