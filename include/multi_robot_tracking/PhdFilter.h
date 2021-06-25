@@ -37,6 +37,7 @@ class PhdFilter
   void phd_update();
   void phd_prune();
   void phd_state_extract();
+  void asynchronous_predict_existing();
   void removeColumn(Eigen::MatrixXd& matrix, unsigned int colToRemove);
   void removeColumnf(Eigen::MatrixXf& matrix, unsigned int colToRemove);
 
@@ -44,6 +45,7 @@ class PhdFilter
   void set_num_drones(int num_drones);
   float clutter_intensity(const float X, const float Y);
   Eigen::MatrixXf left_divide(const Eigen::MatrixXf);
+  void update_F_matrix(float input_dt);
 
 
   ros::Time startTime,endTime,processTime;
@@ -60,6 +62,7 @@ class PhdFilter
   int L = 0;
 
   int k_iteration = 0;
+  bool flag_asynch_start = false;
 
 
   //kalman filter variables
@@ -73,7 +76,8 @@ class PhdFilter
   float prob_survival = 1.0;
   float prob_detection = 1.0;
 
-  float dt = 0;
+  float dt_cam = 0.125; //8hz
+  float dt_imu = 0.01;  //100hz
 
   Eigen::MatrixXf mk_minus_1;
   Eigen::MatrixXf wk_minus_1;
@@ -100,6 +104,7 @@ class PhdFilter
   Eigen::MatrixXf mk_k_minus_1_beforePrediction;
 
   Eigen::MatrixXf Z_k;
+  Eigen::MatrixXf Z_k_previous;
   Eigen::MatrixXf ang_vel_k;
   Eigen::MatrixXf X_k;
 
