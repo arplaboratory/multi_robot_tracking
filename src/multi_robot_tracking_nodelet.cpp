@@ -9,7 +9,6 @@
 #include <ros/ros.h>
 #include <nodelet/nodelet.h>
 #include <geometry_msgs/PoseArray.h>
-#include <vision_msgs/Detection2DArray.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/Imu.h>
 #include <nav_msgs/Odometry.h>
@@ -35,7 +34,6 @@ public:
 
     //callback functions
     void detection_Callback(const geometry_msgs::PoseArray& in_PoseArray); //bbox to track
-
     void image_Callback(const sensor_msgs::ImageConstPtr &img_msg); //rgb raw
     void imu_Callback(const sensor_msgs::ImuConstPtr &imu_msg); //rgb raw
     void image_real_Callback(const sensor_msgs::ImageConstPtr &img_msg); //detected rgb
@@ -341,11 +339,11 @@ void multi_robot_tracking_Nodelet::imu_Callback(const sensor_msgs::ImuConstPtr &
         phd_filter_.ang_vel_k.block<3,1>(0,0) = rotm_world2cam *  phd_filter_.ang_vel_k * phd_filter_.dt_imu;
 
         //asynchronous motion prediction
-//        if(first_track_flag)
-//        {
-//            phd_filter_.asynchronous_predict_existing();
-//            publish_tracks();
-//        }
+        if(first_track_flag)
+        {
+            phd_filter_.asynchronous_predict_existing();
+            publish_tracks();
+        }
 
     }
 
@@ -537,7 +535,6 @@ void multi_robot_tracking_Nodelet::vicon_drone5_Callback(const nav_msgs::Odometr
 
 }
 
-
 /* callback for 2D image to call phd track when using flightmare rosbag data
  * input: PoseArray
  * output: N/A
@@ -641,7 +638,7 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
 
             }
 
-            //consensus_sort();
+            consensus_sort();
 
         }
     }
@@ -828,7 +825,7 @@ void multi_robot_tracking_Nodelet::onInit(void)
     {
         ROS_WARN("will be using: %s", filter_to_use_.c_str());
         init_matrices(); //initialize matrix for storing 3D pose
-        //associate_consensus(); //determine 2d position from known init positions
+        associate_consensus(); //determine 2d position from known init positions
 
     }
 
@@ -843,7 +840,6 @@ void multi_robot_tracking_Nodelet::onInit(void)
 
     //bbox subscription of PoseArray Type
     detection_sub_ = priv_nh.subscribe(input_bbox_topic, 10, &multi_robot_tracking_Nodelet::detection_Callback, this);
-
     //img subscription
     image_sub_ = priv_nh.subscribe(input_img_topic, 10, &multi_robot_tracking_Nodelet::image_Callback, this);
     //imu subscription

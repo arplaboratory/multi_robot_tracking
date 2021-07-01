@@ -18,7 +18,8 @@ void PhdFilter::phd_track()
     ROS_INFO("iter: %d",k_iteration);
 
     //predict existing
-   phd_predict_existing();
+    if(flag_asynch_start) (asynchronous_predict_existing());
+    else phd_predict_existing();
 
     //construct
     phd_construct();
@@ -203,7 +204,7 @@ void PhdFilter::phd_predict_existing()
 
         ang_vel_temp= B.block<4,3>(0,3*i) * ang_vel_k ;
         // Ax + Bu
-        mk_minus_1.block<4,1>(0,i) = F * mk_minus_1.block<4,1>(0,i);
+        mk_minus_1.block<4,1>(0,i) = F * mk_minus_1.block<4,1>(0,i) + ang_vel_temp;
     }
 
 
