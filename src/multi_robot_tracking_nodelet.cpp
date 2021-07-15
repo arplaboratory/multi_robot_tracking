@@ -20,9 +20,13 @@
 //jpdaf filter class
 #include <multi_robot_tracking/JpdafFilter.h>
 
-
+//export and store csv
+#include <iostream>
+#include <fstream>
 
 using namespace std;
+
+bool want_export_toCSV = false;
 
 class multi_robot_tracking_Nodelet : public nodelet::Nodelet
 {
@@ -36,6 +40,8 @@ public:
     void detection_Callback(const geometry_msgs::PoseArray& in_PoseArray); //bbox to track
     void image_Callback(const sensor_msgs::ImageConstPtr &img_msg); //rgb raw
     void imu_Callback(const sensor_msgs::ImuConstPtr &imu_msg); //rgb raw
+    void ground_truth_Callback(const geometry_msgs::PoseArray& in_PoseArray); //bbox projection from ground truth
+
     void image_real_Callback(const sensor_msgs::ImageConstPtr &img_msg); //detected rgb
     void image_realResized_Callback(const sensor_msgs::ImageConstPtr &img_msg); //rgb resized
     void vicon_glass_Callback(const nav_msgs::Odometry::ConstPtr &odom_msg); //vicon 3D ground truth glasses
@@ -100,6 +106,8 @@ public:
     ros::Subscriber detection_sub_;
     ros::Subscriber image_sub_;
     ros::Subscriber imu_sub_;
+    ros::Subscriber groundtruth_sub_;
+
     ros::Subscriber detection_real_sub_;
     ros::Subscriber image_real_sub_;
     ros::Subscriber image_realResized_sub_;
@@ -137,12 +145,15 @@ public:
     Eigen::MatrixXf positions_cam_coordinate;
     Eigen::MatrixXf projected_2d_initial_coord;
 
-     Eigen::MatrixXd id_consensus;
-     Eigen::MatrixXd id_array_init;
+    Eigen::MatrixXd id_consensus;
+    Eigen::MatrixXd id_array_init;
 
 
     //B matrix constants for ang velocity
     float cx, cy, f;
+
+    //output csv file
+    ofstream outputFile;
 
 
 
@@ -290,6 +301,54 @@ void multi_robot_tracking_Nodelet::draw_image()
     //  ROS_WARN("bbox time: %f",bbox_timestamp.toSec());
 
 }
+
+
+void multi_robot_tracking_Nodelet::ground_truth_Callback(const geometry_msgs::PoseArray &in_PoseArray)
+{
+    if(want_export_toCSV)
+    {
+        //only after phd track occurred
+        //    ROS_WARN("inside callback");
+        if(first_track_flag)
+        {
+
+            Eigen::MatrixXf temp_groundtruth, temp_estimation;
+            temp_groundtruth = Eigen::MatrixXf::Zero(2,num_drones);
+            temp_estimation = Eigen::MatrixXf::Zero(2,num_drones);
+
+            //store ground truth value
+            for(int i =0; i < in_PoseArray.poses.size(); i++)
+            {
+                //store Z
+                temp_groundtruth(0,i) = in_PoseArray.poses[i].position.x;
+                temp_groundtruth(1,i) = in_PoseArray.poses[i].position.y;
+
+            }
+
+            //store X_k value
+            for(int i =0; i < phd_filter_.detected_size_k; i++)
+            {
+                //store Z
+                temp_estimation(0,i) = phd_filter_.X_k(0,i);
+                temp_estimation(1,i) = phd_filter_.X_k(1,i);
+
+            }
+
+            //store into csv
+
+            outputFile << ros::Time::now().toSec() << "," <<  temp_groundtruth(0,0) << "," << temp_groundtruth(1,0)<< "," <<
+                          temp_groundtruth(0,1) << "," << temp_groundtruth(1,1) << "," << temp_estimation(0,0)  << "," <<
+                          temp_estimation(1,0)  << "," << temp_estimation(0,1) << "," << temp_estimation(1,1) << "," << endl;
+
+
+            //        ROS_ERROR("saving into csv");
+        }
+    }
+
+
+
+}
+
 
 /* callback for 2D image to store before publishing
  * input: RGB Image
@@ -710,8 +769,8 @@ void multi_robot_tracking_Nodelet::associate_consensus()
     delta_left_to_self(1) = 2;
     delta_left_to_self(2) = 0;
 
-//    delta_right_to_self(0) = init_pos_x_right - init_pos_self_x;
-//    delta_right_to_self(1) = init_pos_y_right - init_pos_self_y;
+    //    delta_right_to_self(0) = init_pos_x_right - init_pos_self_x;
+    //    delta_right_to_self(1) = init_pos_y_right - init_pos_self_y;
     delta_right_to_self(0) = 3.4641;
     delta_right_to_self(1) = -2;
     delta_right_to_self(2) = 0;
@@ -844,6 +903,9 @@ void multi_robot_tracking_Nodelet::onInit(void)
     image_sub_ = priv_nh.subscribe(input_img_topic, 10, &multi_robot_tracking_Nodelet::image_Callback, this);
     //imu subscription
     imu_sub_ = priv_nh.subscribe(input_imu_topic, 10, &multi_robot_tracking_Nodelet::imu_Callback, this);
+    //groundtruth bbox subscription
+    groundtruth_sub_ = priv_nh.subscribe("/hummingbird0/ground_truth/bounding_box", 10, &multi_robot_tracking_Nodelet::ground_truth_Callback, this);
+
 
     //  vicon_glass_sub_ = priv_nh.subscribe("/vicon/TobiiGlasses/odom", 10, &multi_robot_tracking_Nodelet::vicon_glass_Callback, this);
     //  vicon_droneA_sub_ = priv_nh.subscribe("/vicon/DragonFly1/odom", 10, &multi_robot_tracking_Nodelet::vicon_drone1_Callback, this);
@@ -856,6 +918,11 @@ void multi_robot_tracking_Nodelet::onInit(void)
 
     tracked_pose_pub_ = nh.advertise<geometry_msgs::PoseArray>("tracked_pose_output",1);
     tracked_velocity_pub_ = nh.advertise<geometry_msgs::PoseArray>("tracked_velocity_output",1);
+
+    //init export csv file
+    outputFile.open("/home/marklee/rosbag/groundtruth_estimate_Asynch.csv");
+    outputFile << "Time" << "," << "GND_truth_X1" << "," << "GND_truth_Y1" << "," << "GND_truth_X2" << "," << "GND_truth_Y2" << ","
+               << "est_X1" << "," << "est_Y1" << ","  << "est_X2" << "," << "est_Y2" << "," <<  std::endl;
 
 }
 
