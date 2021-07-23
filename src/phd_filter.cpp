@@ -77,6 +77,7 @@ void PhdFilter::initialize_matrix()
     K = Eigen::MatrixXf::Zero(4,4*NUM_DRONES);
 
     X_k = Eigen::MatrixXf::Zero(4,NUM_DRONES);
+    X_k_previous = Eigen::MatrixXf::Zero(4,NUM_DRONES);
 
     B = Eigen::MatrixXf::Zero(4,3*NUM_DRONES);
 
@@ -155,7 +156,7 @@ void PhdFilter::asynchronous_predict_existing()
     //  cout << "B: " << B << endl;
     //  cout << "u: " << ang_vel_k << endl;
 
-    ROS_INFO("size mk-1: %lu ",mk_minus_1.cols());
+    ROS_INFO("size mk-1: %lu, size B: %lu",mk_minus_1.cols(), B.cols());
 
     for (int i = 0; i < mk_minus_1.cols(); i++)
     {
@@ -308,7 +309,7 @@ void PhdFilter::phd_update()
 
     }
 
-    //  cout << "# of Z: "  << detected_size_k << ", # of Jk: "<< numTargets_Jk_k_minus_1 <<  endl;
+//      cout << "# of Z: "  << detected_size_k << ", # of Jk: "<< numTargets_Jk_k_minus_1 <<  endl;
 
 
 
@@ -319,6 +320,7 @@ void PhdFilter::phd_update()
 
         for (int j = 0; j < numTargets_Jk_k_minus_1; j++)
         {
+//            ROS_INFO("j: %d",j);
 
             thisZ.block<2,1>(0,0) = Z_k.block<2,1>(0,z);
 
@@ -335,12 +337,17 @@ void PhdFilter::phd_update()
             double w_val = wk_k_minus_1(j) * pow(2*PI, -1) * pow(cov_pdf.determinant(),-0.5) * exp(w_new_exponent(0,0));
             wk(index)= w_val;
 
+
+
             //update mean
             mk.block<4,1>(0,index) = mk_k_minus_1.block<4,1>(0,j);
             meanDelta = thisZ.block<2,1>(0,0) - mk_k_minus_1.block<2,1>(0,j);
             mk.block<2,1>(0,index) =  mk_k_minus_1.block<2,1>(0,j) + K.block<2,2>(0,4*j)*meanDelta;
             //update cov
             Pk.block<4,4>(0,4*index) = P_k_k.block<4,4>(0,4*j);
+
+//            ROS_INFO("wk: %f",wk(index));
+//            cout << "mk: "<< mk <<  endl;
 
         }
 
@@ -351,6 +358,7 @@ void PhdFilter::phd_update()
         float weight_tally = 0;
         float old_weight;
 
+
         //sum weights
         for(int i = 0; i < numTargets_Jk_k_minus_1; i ++)
         {
@@ -358,14 +366,15 @@ void PhdFilter::phd_update()
             weight_tally = weight_tally + wk(index);
         }
 
+
         //divide sum weights
         for(int i = 0; i < numTargets_Jk_k_minus_1; i ++)
         {
             index = (L) * numTargets_Jk_k_minus_1 + i;
             old_weight = wk(index);
-            float measZx = Z_k(0,i);
-            float measZy = Z_k(1,i);
-            wk(index) = old_weight / ( clutter_intensity(measZx,measZy)+ weight_tally);
+//            float measZx = Z_k(0,i);
+//            float measZy = Z_k(1,i);
+            wk(index) = old_weight / ( clutter_intensity(X_k(0,i),X_k(1,i))+ weight_tally);
 //            wk(index) = old_weight / ( weight_tally);
 
 
@@ -394,16 +403,27 @@ void PhdFilter::phd_prune()
     int index_counter = 0;
     int j = 0;
     int search_index = 0;
+    int update_counter = 0;
 
     Eigen::MatrixXf P_bar_sum, P_val;
     P_val = Eigen::MatrixXf(4,4);
     P_bar_sum = Eigen::MatrixXf::Zero(4,4);
 
+
+    //store for missed detection value
+    for(int i = 0; i < NUM_DRONES; i++)
+    {
+        wk_bar(i) = wk_bar_fixed(i);
+        mk_bar.block<4,1>(0,i) = mk_bar_fixed.block<4,1>(0,i);
+        Pk_bar.block<4,4>(0,4*i) = Pk_bar_fixed.block<4,4>(0,4*i);
+    }
+
+
     //  cout << "wk: "  << wk << endl;
     //find weights threshold
     for(int i = 0; i < wk.cols(); i ++)
     {
-        if(wk(i) > 0.000005)
+        if(wk(i) > 0.1)
         {
             index_counter++;
             I.conservativeResize(1,index_counter);
@@ -418,6 +438,14 @@ void PhdFilter::phd_prune()
 
     for (int i = 0; i < NUM_DRONES; i++)
     {
+
+        ROS_INFO("I length: %lu",I.cols());
+        if(I.cols() == 0)
+        {
+            break;
+        }
+
+        update_counter++;
         //get max weight index
 
         float max = I_weights.maxCoeff(&maxRow, &maxCol);
@@ -428,9 +456,14 @@ void PhdFilter::phd_prune()
         indexOrder(i) = j;
 
         //update w_k_bar,m_k_bar
-        wk_bar(i) = wk(j);
-        mk_bar.block<4,1>(0,i) = mk.block<4,1>(0,j);
-        Pk_bar.block<4,4>(0,4*i) = Pk.block<4,4>(0,4*j);
+//        wk_bar(i) = wk(j);
+//        mk_bar.block<4,1>(0,i) = mk.block<4,1>(0,j);
+//        Pk_bar.block<4,4>(0,4*i) = Pk.block<4,4>(0,4*j);
+
+        int target_index = int(j%NUM_DRONES);
+        wk_bar(target_index) = wk(j);
+        mk_bar.block<4,1>(0,target_index) = mk.block<4,1>(0,j);
+        Pk_bar.block<4,4>(0,4*target_index) = Pk.block<4,4>(0,4*j);
 
 
         //remove index that is same index multiple
@@ -443,15 +476,21 @@ void PhdFilter::phd_prune()
             {
 
                 //remove this index from I, Iweight
-                //        cout << "removing index:" << i << endl;
+                        cout << "removing index:" << i << endl;
                 removeColumn(I,i);
                 removeColumnf(I_weights,i);
-                //        cout << "remaining I:" << I << endl;
+                        cout << "remaining I:" << I << endl;
 
                 //to prevent skipping when [4 7 8 10 11] search index = 1... 4,7 causes to skip
                 i--;
 
             }
+        }
+
+        ROS_INFO("I length: %lu",I.cols());
+        if(I.cols() == 0)
+        {
+            break;
         }
 
         //    cout << "I: "  << I << endl;
@@ -466,7 +505,7 @@ void PhdFilter::phd_prune()
         newIndex = Eigen::MatrixXd(1,indexOrder.cols());
 
         //bring down index to numdrone range
-        for(int i = 0; i <indexOrder.cols(); i++  )
+        for(int i = 0; i <update_counter; i++  )
         {
             newIndex(i) = int(indexOrder(i))%numTargets_Jk_k_minus_1;
             if(newIndex(i) == 0)
@@ -475,7 +514,7 @@ void PhdFilter::phd_prune()
             }
         }
 
-        for(int i = 0; i <indexOrder.cols(); i++  )
+        for(int i = 0; i <update_counter; i++  )
         {
             if(newIndex(i) >  NUM_DRONES)
             {
@@ -486,93 +525,33 @@ void PhdFilter::phd_prune()
         cout << "newIndex: "  << newIndex << endl;
 
         int sortedIndex = 0;
+
+//        cout << "wk_bar: "  << wk_bar << endl;
+//        cout << "mk_bar: "  << endl << mk_bar << endl;
+//        cout << "wk_bar_fixed: "  << wk_bar_fixed << endl;
+//        cout << "mk_bar_fixed: "  << endl << mk_bar_fixed << endl;
+
         //sort highest weight to correct association
-        for(int i = 0; i <indexOrder.cols(); i++  )
+        for(int i = 0; i <NUM_DRONES; i++  )
         {
-            sortedIndex = newIndex(i);
-            wk_bar_fixed(sortedIndex) = wk_bar(i);
-            mk_bar_fixed.block<4,1>(0,sortedIndex) = mk_bar.block<4,1>(0,i);
-            Pk_bar_fixed.block<4,4>(0,4*sortedIndex) = Pk_bar.block<4,4>(0,4*i);
+//            sortedIndex = newIndex(i);
+//            wk_bar_fixed(sortedIndex) = wk_bar(i);
+//            mk_bar_fixed.block<4,1>(0,sortedIndex) = mk_bar.block<4,1>(0,i);
+//            Pk_bar_fixed.block<4,4>(0,4*sortedIndex) = Pk_bar.block<4,4>(0,4*i);
+
+            wk_bar_fixed(i) = wk_bar(i);
+            mk_bar_fixed.block<4,1>(0,i) = mk_bar.block<4,1>(0,i);
+            Pk_bar_fixed.block<4,4>(0,4*i) = Pk_bar.block<4,4>(0,4*i);
         }
+
+        ROS_INFO("updated");
     }
 
-
-
-    /*
-  //sum weight
-  for(int i = 0; i < numTargets_Jk_k_minus_1; i++)
-  {
-    float weight_temp = 0;
-    for(int k = 0; k < NUM_DRONES; k ++)
-    {
-      weight_temp = weight_temp + wk( (i+1)*numTargets_Jk_k_minus_1 + k);
-    }
-    wk_bar(i) = weight_temp;
-
-//    wk_bar(i) = wk( (i+1)*numTargets_Jk_k_minus_1) + wk( (i+1)*numTargets_Jk_k_minus_1 + 1) + wk( (i+1)*numTargets_Jk_k_minus_1 + 2) ;
-  }
-
-  //weight * state
-  int index = 0;
-  Eigen::MatrixXf m_bar_sum;
-  m_bar_sum = Eigen::MatrixXf(4,1);
-
-
-
-  for(int i = 0; i < numTargets_Jk_k_minus_1; i++)
-  {
-    m_bar_sum = Eigen::MatrixXf::Zero(4,1);
-    index = (i+1)*NUM_DRONES;
-    for(int k =0; k < NUM_DRONES; k++ )
-    {
-      m_bar_sum = m_bar_sum + wk(index+k) * mk.block<4,1>(0,index+k);
-    }
-
-//    m_bar_sum = wk(index) * mk.block<4,1>(0,index) + wk(index+1) * mk.block<4,1>(0,index+1) + wk(index+2) * mk.block<4,1>(0,index+2)  ;
-    mk_bar.block<4,1>(0,i) = 1/wk_bar(i) * m_bar_sum;
-  }
-  cout << "wk_bar: " << endl << wk_bar << endl;
-  cout << "mk_bar: " << endl << mk_bar << endl;
-*/
-
-    /*
-  Eigen::MatrixXf P_bar_sum, P_val, delta_m;
-  P_val = Eigen::MatrixXf(4,4);
-  delta_m = Eigen::MatrixXf(4,1);
-  P_bar_sum = Eigen::MatrixXf::Zero(4,4);
-
-  int indexCount = NUM_DRONES-1;
-
-  //update cov bar
-  for(int i = 0; i < numTargets_Jk_k_minus_1; i ++)
-  {
-
-    //clear psum
-    P_bar_sum = Eigen::MatrixXf::Zero(4,4);
-
-    for(int j = 0; j < numTargets_Jk_k_minus_1; j ++)
-    {
-      indexCount = indexCount + 1;
-      //get delta_m
-      delta_m.block<4,1>(0,0) =  mk_bar.block<4,1>(0,i) - mk.block<4,1>(0,indexCount);
-      //get pval
-      P_val.block<4,4>(0,0) = Pk.block<4,4>(0,4*indexCount) + delta_m * delta_m.transpose();
-      P_bar_sum.block<4,4>(0,0) = P_bar_sum + (wk(indexCount) * P_val);
-
-    }
-
-    //pval  / weight
-    Pk_bar.block<4,4>(0,4*i) = P_bar_sum / wk_bar(i);
-
-  }
-  */
-
-    //cout << "Pk_bar: " << endl << Pk_bar << endl;
 
 
     numTargets_Jk_minus_1 = wk_bar_fixed.cols();
     //  cout << "Pk_bar_fixed: " << endl << setprecision(3) << Pk_bar_fixed << endl;
-
+    ROS_INFO("end prune");
 
 
 }
@@ -581,6 +560,7 @@ void PhdFilter::phd_prune()
 void PhdFilter::phd_state_extract()
 {
 
+    ROS_INFO("============ 5. extract ============= ");
     Eigen::MatrixXf velocity, position;
     velocity = Eigen::MatrixXf(2,1);
     position = Eigen::MatrixXf(2,1);
@@ -592,13 +572,18 @@ void PhdFilter::phd_state_extract()
     mk_minus_1 = mk_bar_fixed;
     Pk_minus_1 = Pk_bar_fixed.cwiseAbs();
 
+    X_k = mk_minus_1;
+    cout << "--- X_k: " << endl << X_k << endl;
+
     if (k_iteration > 3)
     {
         for (int i = 0; i < wk_bar_fixed.cols(); i++)
         {
 //            position = (mk_minus_1.block<2,1>(0,i) - mk_k_minus_1_beforePrediction.block<2,1>(0,i)); //TO DO modify beforePrediction
 
-            position = (Z_k.block<2,1>(0,i) - Z_k_previous.block<2,1>(0,i));
+//            position = (Z_k.block<2,1>(0,i) - Z_k_previous.block<2,1>(0,i));
+            position = (X_k.block<2,1>(0,i) - X_k_previous.block<2,1>(0,i));
+
             velocity = position/ (dt_cam*gain_fine_tuned) ;
             mk_minus_1.block<2,1>(2,i) = velocity;
             //          cout << "--- position: " << endl << position << endl;
@@ -608,9 +593,11 @@ void PhdFilter::phd_state_extract()
 
     }
 
+    X_k_previous = X_k;
 
-    X_k = mk_minus_1;
-    cout << "--- X_k: " << endl << X_k << endl;
+
+
+
 
 
 }

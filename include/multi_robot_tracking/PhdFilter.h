@@ -74,7 +74,7 @@ class PhdFilter
   //phd variables
 
   float prob_survival = 1.0;
-  float prob_detection = 1.0;
+  float prob_detection = 0.9;//1.0;
 
   float dt_cam = 0.125; //8hz
   float dt_imu = 0.01;  //100hz
@@ -107,6 +107,7 @@ class PhdFilter
   Eigen::MatrixXf Z_k_previous;
   Eigen::MatrixXf ang_vel_k;
   Eigen::MatrixXf X_k;
+  Eigen::MatrixXf X_k_previous;
 
   Eigen::MatrixXf B;
 

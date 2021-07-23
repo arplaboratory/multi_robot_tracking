@@ -1,9 +1,9 @@
 <launch>
   <arg name="filter" default="phd" />
   <!--"phd" or "jpdaf" -->
-  <arg name="input_bbox_topic" default="/DragonPro2/snpe_ros/detections" /> <!--/DragonPro3/snpe_ros/detections or  /hummingbird0/track/bounding_box-->
-  <arg name="input_img_topic" default="/DragonPro2/image_publisher/image_raw" /> <!-- /DragonPro3/image_publisher/image_raw or  /hummingbird0/camera/rgb -->
-  <arg name="input_imu_topic" default="/DragonPro2/imu" /> <!-- /DragonPro3/imu or /hummingbird0/imu-->
+  <arg name="input_bbox_topic" default="/DragonPro1/snpe_ros/detections" /> <!--/DragonPro3/snpe_ros/detections or  /hummingbird0/track/bounding_box-->
+  <arg name="input_img_topic" default="/DragonPro1/image_publisher/image_raw" /> <!-- /DragonPro3/image_publisher/image_raw or  /hummingbird0/camera/rgb -->
+  <arg name="input_imu_topic" default="/DragonPro1/imu" /> <!-- /DragonPro3/imu or /hummingbird0/imu-->
   <arg name="num_drones" default="2" />
   <arg name="init_pos_self_x" default="0.0" /> <!-- 60-60-60- equalateral traiangle w 2m side. currently hard-coded-->
   <arg name="init_pos_self_y" default="0.0" />

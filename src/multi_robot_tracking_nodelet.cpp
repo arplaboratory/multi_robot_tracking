@@ -26,7 +26,7 @@
 
 using namespace std;
 
-bool want_export_toCSV = false;
+bool want_export_toCSV = true;
 
 class multi_robot_tracking_Nodelet : public nodelet::Nodelet
 {
@@ -271,21 +271,35 @@ void multi_robot_tracking_Nodelet::draw_image()
     }
 
     else {
+
+        //scale 224x224 to 640x480
+        float scale = 480/224;
+        int offsetX = 80; //(640-480)/2
+
+
+
 //        ROS_INFO("drawing phd estimation");
         for(int k=0; k < phd_filter_.X_k.cols(); k++)
         {
-            cv::Point2f target_center(phd_filter_.X_k(0,k),phd_filter_.X_k(1,k));
-            cv::Point2f id_pos(phd_filter_.X_k(0,k),phd_filter_.X_k(1,k)+10);
-            cv::circle(input_image,target_center,4, cv::Scalar(0, 210, 255), 2);
-            putText(input_image, to_string(int(id_consensus(k))), id_pos, cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0, cvScalar(0, 255, 0), 2, cv::LINE_AA);//size 1.5 --> 0.5
+            int scaledX = floor(scale* phd_filter_.X_k(0,k) + offsetX);
+            int scaledY = floor(scale* phd_filter_.X_k(1,k));
+
+            cv::Point2f target_center(scaledX,scaledY);
+            cv::Point2f id_pos(scaledX,scaledY+10);
+            cv::circle(input_image,target_center,6, cv::Scalar(0, 210, 255), 3);
+//            putText(input_image, to_string(int(id_consensus(k))), id_pos, cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0, cvScalar(0, 255, 0), 2, cv::LINE_AA);//size 1.5 --> 0.5
         }
 
         //measured input
         for (int k=0; k < phd_filter_.Z_k.cols(); k++)
         {
-            cv::Point2f measured_center(phd_filter_.Z_k(0,k),phd_filter_.Z_k(1,k));
+
+            int scaledX = floor(scale* phd_filter_.Z_k(0,k) + offsetX);
+            int scaledY = floor(scale* phd_filter_.Z_k(1,k));
+
+            cv::Point2f measured_center(scaledX, scaledY);
             //cv::Point2f id_pos(phd_filter_.Z_k(0,k),phd_filter_.Z_k(1,k)+10);
-            cv::circle(input_image,measured_center,2, cv::Scalar(255, 0, 0), 1);
+            cv::circle(input_image,measured_center,4, cv::Scalar(255, 0, 0), 2);
             //              putText(previous_image, to_string(k), id_pos, cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0, cvScalar(0, 255, 0), 2, cv::LINE_AA);//size 1.5 --> 0.5
 
         }
@@ -661,16 +675,12 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
         phd_filter_.detected_size_k = in_PoseArray.poses.size();
         phd_filter_.Z_k = Eigen::MatrixXf::Zero(4,phd_filter_.detected_size_k);
 
-        phd_filter_.B = Eigen::MatrixXf::Zero(4,3*phd_filter_.detected_size_k);
 
         for(int i =0; i < phd_filter_.detected_size_k; i++)
         {
             //store Z
             phd_filter_.Z_k(0,i) = in_PoseArray.poses[i].position.x;
             phd_filter_.Z_k(1,i) = in_PoseArray.poses[i].position.y;
-
-            //store B matrix for ang velocity
-            phd_filter_.B.block<4,3>(0,3*i) = get_B_ang_vel_matrix(phd_filter_.Z_k(0,i),phd_filter_.Z_k(1,i));
 
         }
 
@@ -707,6 +717,19 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
                 //store Z
                 phd_filter_.Z_k_previous(0,i) = in_PoseArray.poses[i].position.x;
                 phd_filter_.Z_k_previous(1,i) = in_PoseArray.poses[i].position.y;
+
+            }
+
+
+            phd_filter_.B = Eigen::MatrixXf::Zero(4,3*num_drones);
+
+            //update for B ang vel matrix
+            //store B matrix for ang velocity
+            for(int i =0; i < phd_filter_.X_k.cols(); i++)
+            {
+
+        //            phd_filter_.B.block<4,3>(0,3*i) = get_B_ang_vel_matrix(phd_filter_.Z_k(0,i),phd_filter_.Z_k(1,i));
+                phd_filter_.B.block<4,3>(0,3*i) = get_B_ang_vel_matrix(phd_filter_.X_k(0,i),phd_filter_.X_k(1,i));
 
 
             }
