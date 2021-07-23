@@ -34,7 +34,7 @@ void PhdFilter::phd_track()
     //draw_image();
 
     endTime = ros::Time::now();
-    //  ROS_WARN("total plan time: %f [sec]", (endTime - startTime).toSec());
+    ROS_WARN("end of track iteration");
 
 }
 
@@ -147,7 +147,7 @@ void PhdFilter::asynchronous_predict_existing()
     //update F
     update_F_matrix(dt_imu);
 
-    //ROS_INFO("======= 0. asynch predict ======= \n");
+    ROS_INFO("======= 0. asynch predict ======= \n");
     wk_minus_1 = prob_survival * wk_minus_1;
     Eigen::MatrixXf ang_vel_temp;
     ang_vel_temp = Eigen::MatrixXf::Zero(4,3);
@@ -155,6 +155,7 @@ void PhdFilter::asynchronous_predict_existing()
     //  cout << "B: " << B << endl;
     //  cout << "u: " << ang_vel_k << endl;
 
+    ROS_INFO("size mk-1: %lu ",mk_minus_1.cols());
 
     for (int i = 0; i < mk_minus_1.cols(); i++)
     {
@@ -365,6 +366,8 @@ void PhdFilter::phd_update()
             float measZx = Z_k(0,i);
             float measZy = Z_k(1,i);
             wk(index) = old_weight / ( clutter_intensity(measZx,measZy)+ weight_tally);
+//            wk(index) = old_weight / ( weight_tally);
+
 
         }
 
@@ -617,12 +620,12 @@ void PhdFilter::phd_state_extract()
 float PhdFilter::clutter_intensity(const float ZmeasureX, const float ZmeasureY)
 {
     float xMin = 0;
-    float xMax = 360;
+    float xMax = 224;
     float yMin = 0;
-    float yMax = 240;
+    float yMax = 224;
     float uniform_dist = 0;
     float clutter_intensity = 0;
-    float lambda = 12.5*pow(10,-6);
+    float lambda = 12.5*pow(10,-8);
     float volume = 4*pow(10,6);
 
     if(ZmeasureX < xMin) return 0;
