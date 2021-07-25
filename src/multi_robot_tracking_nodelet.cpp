@@ -85,6 +85,7 @@ public:
     double current_timestamp = 0;          //t
     double delta_timestamp = 0;                //dt
     double imu_time = 0;
+    int detection_seq = 0;
 
     bool first_track_flag = false; //flag after 1st track update, use to update asynchronous prediction
 
@@ -255,16 +256,16 @@ void multi_robot_tracking_Nodelet::draw_image()
 
             cv::Point2f target_center(temp_center(0), temp_center(1));
             cv::Point2f id_pos(temp_center(0),temp_center(1)+10);
-            cv::circle(previous_image,target_center,4, cv::Scalar(0, 210, 255), 2);
-            putText(previous_image, to_string(k), id_pos, cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0, cvScalar(0, 255, 0), 2, cv::LINE_AA);//size 1.5 --> 0.5
+            cv::circle(input_image,target_center,4, cv::Scalar(0, 210, 255), 2);
+            putText(input_image, to_string(k), id_pos, cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0, cvScalar(0, 255, 0), 2, cv::LINE_AA);//size 1.5 --> 0.5
 
             //draw cross
             cv::Point2f det_cross_a(temp_center(0)-5, temp_center(1)-5);
             cv::Point2f det_cross_b(temp_center(0)+5, temp_center(1)-5);
             cv::Point2f det_cross_c(temp_center(0)-5, temp_center(1)+5);
             cv::Point2f det_cross_d(temp_center(0)+5, temp_center(1)+5);
-            line(previous_image, det_cross_a, det_cross_d, cv::Scalar(255, 20, 150), 1, 1 );
-            line(previous_image, det_cross_b, det_cross_c, cv::Scalar(255, 20, 150), 1, 1 );
+            line(input_image, det_cross_a, det_cross_d, cv::Scalar(255, 20, 150), 1, 1 );
+            line(input_image, det_cross_b, det_cross_c, cv::Scalar(255, 20, 150), 1, 1 );
         }
 
 
@@ -315,7 +316,7 @@ void multi_robot_tracking_Nodelet::draw_image()
     //  }
 
     image_msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", input_image).toImageMsg();
-    image_msg->header.stamp = prev_img_timestamp;
+    image_msg->header.stamp = img_timestamp;
     image_pub_.publish(image_msg);
 
     //  ROS_WARN("img time: %f",prev_img_timestamp.toSec());
@@ -378,19 +379,40 @@ void multi_robot_tracking_Nodelet::ground_truth_Callback(const geometry_msgs::Po
 void multi_robot_tracking_Nodelet::image_Callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
 
+    //image timestamp is faster than detection result timestamp by approx 1 second. store image in buffer
+    image_buffer_.push_back(img_msg);
 
-    img_timestamp = img_msg->header.stamp;
-    cv_bridge::CvImageConstPtr im_ptr_ = cv_bridge::toCvShare(img_msg, "rgb8");
-    input_image = im_ptr_->image;
+    ROS_INFO("img buff size: %lu",image_buffer_.size());
+
+    //look up first image with timestamp smaller than
+    for(int i = 0; i < image_buffer_.size(); i++)
+    {
+        ROS_INFO("looking for timestamp less than: %f, image buff[i].stamp: %f",current_timestamp, image_buffer_[i]->header.stamp.toSec() );
+        //if found image with matching detection sequence
+        if(image_buffer_[i]->header.stamp.toSec() <= current_timestamp)
+        {
+            ROS_INFO("FOUND IMG match");
+            auto sync_image_ptr = image_buffer_[i];
+            //store img pointer
+            img_timestamp = image_buffer_[i]->header.stamp;
+            cv_bridge::CvImageConstPtr im_ptr_ = cv_bridge::toCvShare(sync_image_ptr, "rgb8");
+            input_image = im_ptr_->image;
+
+            //draw image with matched image
+
+            draw_image();
+
+            //remove from img buffer
+            image_buffer_.erase(image_buffer_.begin() + i);
+
+            break;
+        }
+
+    }
 
 
-    draw_image();
 
 
-
-    prev_img_timestamp = img_msg->header.stamp;
-    cv_bridge::CvImageConstPtr prev_im_ptr_ = cv_bridge::toCvShare(img_msg, "rgb8");
-    previous_image = prev_im_ptr_->image;
 }
 
 /* callback for imu to store for faster motion prediction
@@ -631,6 +653,9 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
     //get time of detection
     bbox_timestamp = in_PoseArray.header.stamp;
     current_timestamp = bbox_timestamp.toSec();
+
+
+
 
     ROS_WARN("bbox time: %f, dt: %f, imu time: %f",current_timestamp, delta_timestamp, imu_time);
 
