@@ -168,6 +168,28 @@ void PhdFilter::asynchronous_predict_existing()
         mk_minus_1.block<4,1>(0,i) = F * mk_minus_1.block<4,1>(0,i) + ang_vel_temp;
     }
 
+//    % F =
+//    %
+//    % [(omegay*(2*cu - 2*pu))/f - (omegax*(cv - pv))/f + 1, dt,                       omegaz - (omegax*(cu - pu))/f,  0]
+//    % [                                                  0,  1,                                                   0,  0]
+//    % [                      (omegay*(cv - pv))/f - omegaz,  0, (omegay*(cu - pu))/f - (omegax*(2*cv - 2*pv))/f + 1, dt]
+//    % [                                                  0,  0,                                                   0,  1]
+//    %
+
+    Eigen::MatrixXf F_modified;
+    F_modified = Eigen::MatrixXf(4,4);
+
+    float cu = 329; //from flightmare simulation
+    float cv = 243;
+    float f = 431;
+    float omega_x = ang_vel_k(0);
+    float omega_y = ang_vel_k(1);
+    float omega_z = ang_vel_k(2);
+    float dt = 0.225;
+    float pu = 0;
+    float pv = 0;
+
+
 
     Eigen::MatrixXf P_temp;
     P_temp = Eigen::MatrixXf(4,4);
@@ -175,12 +197,23 @@ void PhdFilter::asynchronous_predict_existing()
     for(int j = 0; j < mk_minus_1.cols(); j ++)
     {
         P_temp = Pk_minus_1.block<4,4>(0,4*j);
-        P_temp = Q + F* P_temp * F.transpose();
+
+        pu = X_k(0,j);
+        pv = X_k(1,j);
+
+        F_modified(0,0) = (omega_y*(2*cu - 2*pu))/f - (omega_x*(cv - pv))/f + 1;    F_modified(0,1) = dt;   F_modified(0,2) = omega_z - (omega_x*(cu - pu))/f;    F_modified(0,3) = 0;
+        F_modified(1,0) = 0;                                                        F_modified(1,1) = 1;    F_modified(1,2) = 0;                                  F_modified(1,3) = 0;
+        F_modified(2,0) = (omega_y*(cv - pv))/f - omega_z;                          F_modified(2,1) = 0;    F_modified(2,2) = (omega_y*(cu - pu))/f - (omega_x*(2*cv - 2*pv))/f + 1;    F_modified(2,3) = dt;
+        F_modified(3,0) = 0;                                                        F_modified(3,1) = 0;    F_modified(3,2) = 0;                                  F_modified(3,3) = 1;
+
+
+        P_temp = Q + F_modified* P_temp * F_modified.transpose();
         Pk_minus_1.block<4,4>(0,4*j) = P_temp;
     }
 
     X_k = mk_minus_1;
 //    cout << "***Asynch X_k: " << endl << X_k << endl;
+    ROS_ERROR("NEW ASYNCH");
 
 }
 

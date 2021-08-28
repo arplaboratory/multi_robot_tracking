@@ -210,7 +210,7 @@ void multi_robot_tracking_Nodelet::init_matrices()
    * [0   0   1]
    */
 
-    cx = 329; //from flightmare simulation
+    cx = 329; //from HW
     cy = 243;
     f = 431;
 
