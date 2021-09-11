@@ -285,7 +285,7 @@ void multi_robot_tracking_Nodelet::draw_image()
             cv::Point2f target_center(scaledX,scaledY);
             cv::Point2f id_pos(scaledX,scaledY+10);
             cv::circle(input_image,target_center,6, cv::Scalar(0, 210, 255), 3);
-//            putText(input_image, to_string(int(id_consensus(k))), id_pos, cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0, cvScalar(0, 255, 0), 2, cv::LINE_AA);//size 1.5 --> 0.5
+            putText(input_image, to_string(int(id_consensus(k))), id_pos, cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0, cvScalar(0, 255, 0), 2, cv::LINE_AA);//size 1.5 --> 0.5
         }
 
         //measured input
@@ -333,7 +333,7 @@ void multi_robot_tracking_Nodelet::ground_truth_Callback(const geometry_msgs::Po
     if(want_export_toCSV)
     {
         //only after phd track occurred
-        //    ROS_WARN("inside callback");
+            ROS_WARN("inside callback");
         if(first_track_flag)
         {
 
@@ -366,7 +366,7 @@ void multi_robot_tracking_Nodelet::ground_truth_Callback(const geometry_msgs::Po
                           temp_estimation(1,0)  << "," << temp_estimation(0,1) << "," << temp_estimation(1,1) << "," << endl;
 
 
-            //        ROS_ERROR("saving into csv");
+                    ROS_ERROR("saving into csv");
         }
     }
 
@@ -720,7 +720,7 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
 
         if(phd_filter_.first_callback)
         {
-            delta_timestamp = 0.225;
+            delta_timestamp = 0.143; //0.225
             phd_filter_.dt_cam = delta_timestamp;
 
             phd_filter_.initialize();
@@ -733,7 +733,7 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
         {
 
 
-            delta_timestamp = 0.225; //hard-coded for 4.5 Hz TO DO FIX
+            delta_timestamp = 0.143; //hard-coded for 4.5 Hz TO DO FIX
             //      delta_timestamp = current_timestamp - previous_timestamp;
             //check for data with no timestamp and thus dt = 0
 
@@ -766,7 +766,7 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
 
             }
 
-            //consensus_sort();
+            consensus_sort();
 
         }
     }

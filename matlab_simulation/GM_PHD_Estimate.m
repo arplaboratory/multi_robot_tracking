@@ -96,8 +96,8 @@ X_k;
 X_k_history = [X_k_history, X_k];
 
 if k>2
-    velocity = (Z - zTrueHistory(:,3*k-5:3*k-3))/dt;
-%     velocity = (X_k_history(1:2,3*k-2:3*k) - X_k_history(1:2,3*k-5:3*k-3))/dt;
+%     velocity = (Z - zTrueHistory(:,3*k-5:3*k-3))/dt;
+    velocity = (X_k_history(1:2,3*k-2:3*k) - X_k_history(1:2,3*k-5:3*k-3))/dt;
     %% update velocities
     for i = 1:length(w_bar_k_fixed)
         mk_minus_1(3:4,i) = velocity(:,i);

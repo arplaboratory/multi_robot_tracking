@@ -66,3 +66,5 @@ Pk_k_minus_1 = [Pk_minus_1, P_birth ];
 numTargets_Jk_k_minus_1 = numTargets_Jk_minus_1 + numBirthedTargets ; 
 %Create a backup to allow for augmenting the measurement in the update
 mk_k_minus_1_before_prediction = [mk_k_minus_1_before_prediction, m_birth_before_prediction];%m_birth_before_prediction also contains the spawned targets before prediction
+
+numTargets_Jk_k_minus_1_history = [numTargets_Jk_k_minus_1_history numTargets_Jk_k_minus_1];

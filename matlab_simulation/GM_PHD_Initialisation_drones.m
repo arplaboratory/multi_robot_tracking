@@ -32,7 +32,7 @@ if(USE_REAL_DATA)
     
 else
     %% Read Rosbag and fill in PX, PY
-    measure_bag = rosbag("drone_2d_3drones_imu.bag");
+    measure_bag = rosbag("/rosbag/drone_2d_3drones_imu.bag");
     pos_bag = select(measure_bag, 'Topic', "/hummingbird0/track/bounding_box");
     imu_bag = select(measure_bag, 'Topic', "/hummingbird0/imu");
 
@@ -90,6 +90,8 @@ temp = [];
 %than this.
 MAX_V = 30;
 
+numTargets_J_pruned_history = [];
+numTargets_Jk_k_minus_1_history = [];
 
 %% Utility functions
 calculateDataRange2 = @(j) (2*j-1):(2*j);%Used to calculate the indices of two-dimensional target j in a long list of two-dimensional targets

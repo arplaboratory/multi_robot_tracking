@@ -40,9 +40,9 @@ end
 T = 10^-5;%Weight threshold. Value the weight needs to be above to be considered a target rather than be deleted immediately.
 mergeThresholdU = 0.00001; %1;
 %sim data noise
-noiseScaler = 0;       %Adjust the strength of the noise on the measurements by adjusting this. Useful for debugging.
+noiseScaler = 0.25;       %Adjust the strength of the noise on the measurements by adjusting this. Useful for debugging.
 %false positive
-nClutter = 0; %Assume constant 50 clutter measurements. Since clutter is Poisson distrbuted it might be more accurate to use nClutter = poissrnd(50) if you have the required Matlab toolbox. Constant 50 clutter works well enough for simulation purposes.
+nClutter = 5; %Assume constant 50 clutter measurements. Since clutter is Poisson distrbuted it might be more accurate to use nClutter = poissrnd(50) if you have the required Matlab toolbox. Constant 50 clutter works well enough for simulation purposes.
 %false negative
 prob_detection = 1; %Probability of target detection. Used in recalculating weights in GM_PHD_Update
 
@@ -106,6 +106,8 @@ while (k < endTime)%k = timestep
     if(rem(k,PLOT_DOWN_SAMPLE)==0)
         GM_PHD_Simulate_Plot;
     end
+    
+    plt_fig_eight;
     
 
 end
