@@ -1,0 +1,22 @@
+input_bbox_topic: "/DragonPro1/snpe_ros/detections"
+input_img_topic: "/DragonPro1/image_publisher/image_raw"
+input_imu_topic: "/DragonPro1/imu"
+
+init_pos_self_x: 0.0
+init_pos_self_y: 0.0
+init_pos_x_left: 3.4641
+init_pos_y_left: 2.0
+init_pos_x_right: 3.4641
+init_pos_y_right: -2.0
+id_self: 2
+id_left: 1
+id_right: 4
+  
+camera_cx: 329
+camera_cy: 243
+camera_f: 431
+  
+viz_detection_height: 168
+viz_detection_width: 224
+viz_detection_offset_x: 0
+viz_detection_offset_y: 28
