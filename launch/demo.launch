@@ -1,9 +1,14 @@
 <launch>
   <arg name="filter" default="phd" />
+  <arg name="sim" default="false" />
+
   <!--"phd" or "jpdaf" -->
   <arg name="input_bbox_topic" default="/DragonPro1/snpe_ros/detections"/> <!--/DragonPro3/snpe_ros/detections or  /hummingbird0/track/bounding_box-->
   <arg name="input_img_topic" default="/DragonPro1/image_publisher/image_raw"/> <!-- /DragonPro3/image_publisher/image_raw or  /hummingbird0/camera/rgb -->
   <arg name="input_imu_topic" default="/DragonPro1/imu"/> <!-- /DragonPro3/imu or /hummingbird0/imu-->
+  <arg name="input_bbox_topic_sim" default="/hummingbird0/track/bounding_box"/> <!--/DragonPro3/snpe_ros/detections or  /hummingbird0/track/bounding_box-->
+  <arg name="input_img_topic_sim" default="/hummingbird0/camera/rgb"/> <!-- /DragonPro3/image_publisher/image_raw or  /hummingbird0/camera/rgb -->
+  <arg name="input_imu_topic_sim" default="/hummingbird0/imu"/> <!-- /DragonPro3/imu or /hummingbird0/imu-->
   <arg name="num_drones" default="2" />
   <arg name="init_pos_self_x" default="0.0" /> <!-- 60-60-60- equalateral traiangle w 2m side. currently hard-coded-->
   <arg name="init_pos_self_y" default="0.0" />
@@ -18,13 +23,21 @@
   <arg name="nodelet_manager_name" default="nodelet_manager_multi_tracking" />
   <param name="filter" value="$(arg filter)" />
   <param name="/use_sim_time" value="false" />
+
   <!-- Related Nodelets-->
   <group ns="/hummingbird0">
     <node pkg="nodelet" type="nodelet" name="$(arg nodelet_manager_name)" args="manager" output="screen" if="$(arg start_nodelet_manager)" />
     <node pkg="nodelet" type="nodelet" args="load multi_robot_tracking/multi_robot_tracking_Nodelet $(arg nodelet_manager_name)" name="multi_tracking" required="true" output="screen">
       <param name="filter" value="$(arg filter)" />
-      <param name="input_bbox_topic" value="$(arg input_bbox_topic)" />
-      <param name="input_img_topic" value="$(arg input_img_topic)" />
+        
+      <param name="input_bbox_topic" value="$(arg input_bbox_topic_sim)" if="$(arg sim)" />
+      <param name="input_img_topic" value="$(arg input_img_topic_sim)" if="$(arg sim)" />
+      <param name="input_imu_topic" value="$(arg input_imu_topic_sim)" if="$(arg sim)" />
+
+      <param name="input_bbox_topic" value="$(arg input_bbox_topic)" unless="$(arg sim)"/>
+      <param name="input_img_topic" value="$(arg input_img_topic)" unless="$(arg sim)" />
+      <param name="input_imu_topic" value="$(arg input_imu_topic)" unless="$(arg sim)" />
+      
       <param name="num_drones" value="$(arg num_drones)" />
       <param name="init_pos_self_x" value="$(arg init_pos_self_x)" />
       <param name="init_pos_self_y" value="$(arg init_pos_self_y)" />
@@ -37,7 +50,5 @@
       <param name="id_right" value="$(arg id_right)" />
     </node>
   </group>
-  <!-- RVIZ 
-       <node pkg="rviz" type="rviz" name="rviz" args="-d $(find multi_robot_tracking)/rviz/darknet_vis.rviz" />
-  -->
+
 </launch>
