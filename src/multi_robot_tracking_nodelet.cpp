@@ -28,6 +28,7 @@ using namespace std;
 
 bool want_export_toCSV = true;
 
+
 class multi_robot_tracking_Nodelet : public nodelet::Nodelet
 {
 public:
@@ -42,12 +43,6 @@ public:
     void imu_Callback(const sensor_msgs::ImuConstPtr &imu_msg); //rgb raw
     void ground_truth_Callback(const geometry_msgs::PoseArray& in_PoseArray); //bbox projection from ground truth
 
-    void image_real_Callback(const sensor_msgs::ImageConstPtr &img_msg); //detected rgb
-    void image_realResized_Callback(const sensor_msgs::ImageConstPtr &img_msg); //rgb resized
-    void vicon_glass_Callback(const nav_msgs::Odometry::ConstPtr &odom_msg); //vicon 3D ground truth glasses
-    void vicon_drone1_Callback(const nav_msgs::Odometry::ConstPtr &odom_msg); //vicon 3D ground truth drone
-    void vicon_drone2_Callback(const nav_msgs::Odometry::ConstPtr &odom_msg); //vicon 3D ground truth drone
-    void vicon_drone5_Callback(const nav_msgs::Odometry::ConstPtr &odom_msg); //vicon 3D ground truth drone
     Eigen::MatrixXf get_B_ang_vel_matrix(float x, float y); //return B matrix for each measurement
 
 
@@ -108,14 +103,6 @@ public:
     ros::Subscriber image_sub_;
     ros::Subscriber imu_sub_;
     ros::Subscriber groundtruth_sub_;
-
-    ros::Subscriber detection_real_sub_;
-    ros::Subscriber image_real_sub_;
-    ros::Subscriber image_realResized_sub_;
-    ros::Subscriber vicon_glass_sub_;
-    ros::Subscriber vicon_droneA_sub_;
-    ros::Subscriber vicon_droneB_sub_;
-    ros::Subscriber vicon_droneC_sub_;
 
     //output RGB data, pose data
     cv::Mat input_image;
@@ -246,7 +233,7 @@ void multi_robot_tracking_Nodelet::init_matrices()
 void multi_robot_tracking_Nodelet::draw_image()
 {
 
-    if(filter_to_use_.compare("jpdaf") == 0)
+    if(filter_to_use_.compare("jpdaf") == 0) // Does not work
     {
         //          ROS_INFO("drawing jpdaf estimation");
         for(int k=0; k < jpdaf_filter_.tracks_.size(); k++)
@@ -267,16 +254,10 @@ void multi_robot_tracking_Nodelet::draw_image()
             line(input_image, det_cross_a, det_cross_d, cv::Scalar(255, 20, 150), 1, 1 );
             line(input_image, det_cross_b, det_cross_c, cv::Scalar(255, 20, 150), 1, 1 );
         }
-
-
     }
-
-    else {
-
+    else 
+    {
         //scale 224x224 to 640x480
-
-
-//        ROS_INFO("drawing phd estimation");
         for(int k=0; k < phd_filter_.X_k.cols(); k++)
         {
             int scaledX = floor(phd_filter_.X_k(0,k) * 640 / 224.0);
@@ -369,9 +350,6 @@ void multi_robot_tracking_Nodelet::ground_truth_Callback(const geometry_msgs::Po
                     ROS_ERROR("saving into csv");
         }
     }
-
-
-
 }
 
 
@@ -414,10 +392,6 @@ void multi_robot_tracking_Nodelet::image_Callback(const sensor_msgs::ImageConstP
         }
 
     }
-
-
-
-
 }
 
 /* callback for imu to store for faster motion prediction
@@ -463,131 +437,6 @@ void multi_robot_tracking_Nodelet::imu_Callback(const sensor_msgs::ImuConstPtr &
 
 }
 
-void multi_robot_tracking_Nodelet::image_real_Callback(const sensor_msgs::ImageConstPtr &img_msg)
-{
-    //  ROS_INFO("image cb with HxW: %d,%d", img_msg->height, img_msg->width);
-    cv_bridge::CvImageConstPtr im_ptr_ = cv_bridge::toCvShare(img_msg, "rgb8");
-    input_image = im_ptr_->image;
-
-    //  ROS_WARN("time:%f",img_msg->header.stamp.toSec() );
-
-    //
-    draw_image();
-}
-
-void multi_robot_tracking_Nodelet::image_realResized_Callback(const sensor_msgs::ImageConstPtr &img_msg)
-{
-    //  ROS_WARN("time:%f",img_msg->header.stamp.sec );
-    //  ROS_INFO("image cb with HxW: %d,%d", img_msg->height, img_msg->width);
-    cv_bridge::CvImageConstPtr im_ptr_ = cv_bridge::toCvShare(img_msg, "rgb8");
-    input_image = im_ptr_->image;
-
-}
-
-/* callback for 3D Vicon ground truth
- * input: odom msg
- * output: N/A
- */
-void multi_robot_tracking_Nodelet::vicon_glass_Callback(const nav_msgs::Odometry::ConstPtr &odom_msg)
-{
-
-    //  ROS_WARN("--odom time:%d",odom_msg->header.stamp.sec );
-    //  syncTime = odom_msg->header.stamp;
-
-    //  ROS_INFO("glass cb");
-    //translation
-    glasses_3Dpose4x4(0,3) = odom_msg->pose.pose.position.x;
-    glasses_3Dpose4x4(1,3) = odom_msg->pose.pose.position.y;
-    glasses_3Dpose4x4(2,3) = odom_msg->pose.pose.position.z;
-
-    //rotation
-    Eigen::Quaternionf q;
-    q.x() = odom_msg->pose.pose.orientation.x;
-    q.y() = odom_msg->pose.pose.orientation.y;
-    q.z() = odom_msg->pose.pose.orientation.z;
-    q.w() = odom_msg->pose.pose.orientation.w;
-
-    Eigen::Matrix3f rotation_mat = q.normalized().toRotationMatrix();
-    glasses_3Dpose4x4.block<3,3>(0,0) = rotation_mat.block<3,3>(0,0);
-
-    //pad 4x[1:4] with [ 0 0 0 1 ]
-    glasses_3Dpose4x4.block<1,4>(3,0) = Hmatfiller1x4.block<1,4>(0,0);
-
-    //  cout << "glass_wrt_world: " << endl << glasses_3Dpose4x4 << endl;
-    //  cout << "drone_wrt_world: " << endl << droneA_3Dpose4x1 << endl;
-
-    Eigen::MatrixXf droneA_3Dpose3x1_glass,droneA_3Dpose4x1_glass;
-    droneA_3Dpose4x1_glass = Eigen::MatrixXf(4,1);
-    droneA_3Dpose3x1_glass = Eigen::MatrixXf(3,1);
-
-    Eigen::MatrixXf droneB_3Dpose3x1_glass,droneB_3Dpose4x1_glass;
-    droneB_3Dpose4x1_glass = Eigen::MatrixXf(4,1);
-    droneB_3Dpose3x1_glass = Eigen::MatrixXf(3,1);
-
-    Eigen::MatrixXf droneC_3Dpose3x1_glass,droneC_3Dpose4x1_glass;
-    droneC_3Dpose4x1_glass = Eigen::MatrixXf(4,1);
-    droneC_3Dpose3x1_glass = Eigen::MatrixXf(3,1);
-
-    //Drone position w.r.t to Glass
-    droneA_3Dpose4x1_glass = glasses_3Dpose4x4.inverse() * droneA_3Dpose4x1;
-    droneA_3Dpose3x1_glass = droneA_3Dpose4x1_glass.block<3,1>(0,0);
-
-    droneB_3Dpose4x1_glass = glasses_3Dpose4x4.inverse() * droneB_3Dpose4x1;
-    droneB_3Dpose3x1_glass = droneB_3Dpose4x1_glass.block<3,1>(0,0);
-
-    droneC_3Dpose4x1_glass = glasses_3Dpose4x4.inverse() * droneC_3Dpose4x1;
-    droneC_3Dpose3x1_glass = droneC_3Dpose4x1_glass.block<3,1>(0,0);
-    //  cout << "drone_wrt_glass3x1: " << endl << droneA_3Dpose3x1_glass << endl;
-
-    /* lamda [x y 1]' = k * [R t] * [Xw Yw Zw 1]'
-   * 3D to 2D projective equation
-   */
-    vicon_projectedA_2Dpose3x1 = k_matrix3x3 * rotm_world2cam * droneA_3Dpose3x1_glass;
-    float scaling_factor = vicon_projectedA_2Dpose3x1(2);
-    vicon_projectedA_2Dpose3x1 = vicon_projectedA_2Dpose3x1 / scaling_factor;
-
-    vicon_projectedB_2Dpose3x1 = k_matrix3x3 * rotm_world2cam * droneB_3Dpose3x1_glass;
-    scaling_factor = vicon_projectedB_2Dpose3x1(2);
-    vicon_projectedB_2Dpose3x1 = vicon_projectedB_2Dpose3x1 / scaling_factor;
-
-    vicon_projectedC_2Dpose3x1 = k_matrix3x3 * rotm_world2cam * droneC_3Dpose3x1_glass;
-    scaling_factor = vicon_projectedC_2Dpose3x1(2);
-    vicon_projectedC_2Dpose3x1 = vicon_projectedC_2Dpose3x1 / scaling_factor;
-
-    //  cout << "VICON 2Dprojected: (" << vicon_projectedA_2Dpose3x1(0) << "," << vicon_projectedA_2Dpose3x1(1) << ") " <<
-    //        "(" << vicon_projectedB_2Dpose3x1(0) << "," << vicon_projectedB_2Dpose3x1(1) << ") "
-    //        "(" << vicon_projectedC_2Dpose3x1(0) << "," << vicon_projectedC_2Dpose3x1(1) << ") " << endl;
-
-    //store into vicon projection array
-    vicon_projected_2DposeArray.block<3,1>(0,0) = vicon_projectedA_2Dpose3x1;
-    vicon_projected_2DposeArray.block<3,1>(0,1) = vicon_projectedB_2Dpose3x1;
-    vicon_projected_2DposeArray.block<3,1>(0,2) = vicon_projectedC_2Dpose3x1;
-
-    //offset Y for vicon to glass error
-    for(int i =0; i< num_drones; i++)
-    {
-        vicon_projected_2DposeArray(1,i) = vicon_projected_2DposeArray(1,i) - 180; //1/3 of the height offset?
-    }
-
-    //test projection correlation direction by plotting
-    /*
-  nav_msgs::Odometry test_pose, test_proj_pose;
-  test_pose.header.stamp = odom_msg->header.stamp;
-  test_pose.pose.pose.position.x = droneA_3Dpose3x1_glass(0);
-  test_pose.pose.pose.position.y = droneA_3Dpose3x1_glass(1);
-  test_pose.pose.pose.position.z = droneA_3Dpose3x1_glass(2);
-
-  test_proj_pose.header.stamp = odom_msg->header.stamp;
-  test_proj_pose.pose.pose.position.x = vicon_projected_2Dpose3x1(0);
-  test_proj_pose.pose.pose.position.y = vicon_projected_2Dpose3x1(1);
-  test_proj_pose.pose.pose.position.z = vicon_projected_2Dpose3x1(2);
-
-  pose_glass2drone_pub_.publish(test_pose);
-  pose_glass2drone_proj_pub_.publish(test_proj_pose);
-  */
-
-}
-
 Eigen::MatrixXf multi_robot_tracking_Nodelet::get_B_ang_vel_matrix(float x, float y)
 {
     Eigen::MatrixXf temp_B_matrix;
@@ -603,51 +452,6 @@ Eigen::MatrixXf multi_robot_tracking_Nodelet::get_B_ang_vel_matrix(float x, floa
 
 }
 
-/* callback for 3D Vicon ground truth
- * input: odom msg
- * output: N/A [Xw Yw Zw 1]'
- */
-void multi_robot_tracking_Nodelet::vicon_drone1_Callback(const nav_msgs::Odometry::ConstPtr &odom_msg)
-{
-    //  ROS_INFO("drone cb");
-    droneA_3Dpose4x1(0) = odom_msg->pose.pose.position.x;
-    droneA_3Dpose4x1(1) = odom_msg->pose.pose.position.y;
-    droneA_3Dpose4x1(2) = odom_msg->pose.pose.position.z;
-    droneA_3Dpose4x1(3) = 1;
-
-    //  cout << "dronematrix: " << endl << droneA_3Dpose4x1 << endl;
-}
-
-/* callback for 3D Vicon ground truth
- * input: odom msg
- * output: N/A
- */
-void multi_robot_tracking_Nodelet::vicon_drone2_Callback(const nav_msgs::Odometry::ConstPtr &odom_msg)
-{
-    //  ROS_INFO("drone cb");
-    droneB_3Dpose4x1(0) = odom_msg->pose.pose.position.x;
-    droneB_3Dpose4x1(1) = odom_msg->pose.pose.position.y;
-    droneB_3Dpose4x1(2) = odom_msg->pose.pose.position.z;
-    droneB_3Dpose4x1(3) = 1;
-
-
-
-}
-
-/* callback for 3D Vicon ground truth
- * input: odom msg
- * output: N/A
- */
-void multi_robot_tracking_Nodelet::vicon_drone5_Callback(const nav_msgs::Odometry::ConstPtr &odom_msg)
-{
-    //  ROS_INFO("drone cb");
-    droneC_3Dpose4x1(0) = odom_msg->pose.pose.position.x;
-    droneC_3Dpose4x1(1) = odom_msg->pose.pose.position.y;
-    droneC_3Dpose4x1(2) = odom_msg->pose.pose.position.z;
-    droneC_3Dpose4x1(3) = 1;
-
-
-}
 
 /* callback for 2D image to call phd track when using flightmare rosbag data
  * input: PoseArray
@@ -817,60 +621,6 @@ void multi_robot_tracking_Nodelet::consensus_sort()
 
 }
 
-
-/*
- *
- */
-void multi_robot_tracking_Nodelet::associate_consensus()
-{
-    //ROS_WARN("inside consensus func");
-
-    //get delta init positions in world coordinate
-    Eigen::MatrixXf delta_left_to_self, delta_right_to_self;
-    Eigen::MatrixXf projected_2d_padding;
-    delta_left_to_self = Eigen::MatrixXf::Zero(3,1);
-    delta_right_to_self = Eigen::MatrixXf::Zero(3,1);
-    projected_2d_padding = Eigen::MatrixXf::Zero(3,num_drones);
-
-    //delta_left_to_self(0) = init_pos_x_left - init_pos_self_x;
-    //delta_left_to_self(1) = init_pos_y_left - init_pos_self_y;
-    delta_left_to_self(0) = 3.4641;
-    delta_left_to_self(1) = 2;
-    delta_left_to_self(2) = 0;
-
-    //    delta_right_to_self(0) = init_pos_x_right - init_pos_self_x;
-    //    delta_right_to_self(1) = init_pos_y_right - init_pos_self_y;
-    delta_right_to_self(0) = 3.4641;
-    delta_right_to_self(1) = -2;
-    delta_right_to_self(2) = 0;
-
-    cout << "deltaL: " << endl << delta_left_to_self << endl;
-    cout << "deltaR: " << endl << delta_right_to_self << endl;
-
-    positions_world_coordinate.block<3,1>(0,0) = delta_left_to_self;
-    positions_world_coordinate.block<3,1>(0,1) = delta_right_to_self;
-
-    //get delta init positions in camera coordinate
-    positions_cam_coordinate.block<3,1>(0,0) = rotm_world2cam * positions_world_coordinate.block<3,1>(0,0) ;
-    positions_cam_coordinate.block<3,1>(0,1) = rotm_world2cam * positions_world_coordinate.block<3,1>(0,1) ;
-
-    cout << "positions_cam_coordinate: " << endl << positions_cam_coordinate << endl;
-
-
-    //project into 2D space
-    for(int i =0; i < num_drones;i++)
-    {
-        projected_2d_padding.block<3,1>(0,i) = k_matrix3x3 * positions_cam_coordinate.block<3,1>(0,i);
-        projected_2d_padding.block<3,1>(0,i) = projected_2d_padding.block<3,1>(0,i) / projected_2d_padding(2,i);
-        projected_2d_initial_coord.block<2,1>(0,i) = projected_2d_padding.block<2,1>(0,i);
-    }
-
-    cout << "projected_2d_initial_coord: " << endl << projected_2d_initial_coord << endl;
-
-
-}
-
-
 void multi_robot_tracking_Nodelet::publish_tracks()
 {
 //    ROS_INFO("publish tracks");
@@ -948,7 +698,7 @@ void multi_robot_tracking_Nodelet::onInit(void)
     priv_nh.param<int>("id_left",id_left,0);
     priv_nh.param<int>("id_right",id_right,0);
 
-
+    
 
 
     if(filter_to_use_.compare("phd") == 0) //using phd
@@ -968,6 +718,7 @@ void multi_robot_tracking_Nodelet::onInit(void)
         return;
     }
 
+
     //bbox subscription of PoseArray Type
     detection_sub_ = priv_nh.subscribe(input_bbox_topic, 10, &multi_robot_tracking_Nodelet::detection_Callback, this);
     //img subscription
@@ -978,17 +729,10 @@ void multi_robot_tracking_Nodelet::onInit(void)
     groundtruth_sub_ = priv_nh.subscribe("/hummingbird0/ground_truth/bounding_box", 10, &multi_robot_tracking_Nodelet::ground_truth_Callback, this);
 
 
-    //  vicon_glass_sub_ = priv_nh.subscribe("/vicon/TobiiGlasses/odom", 10, &multi_robot_tracking_Nodelet::vicon_glass_Callback, this);
-    //  vicon_droneA_sub_ = priv_nh.subscribe("/vicon/DragonFly1/odom", 10, &multi_robot_tracking_Nodelet::vicon_drone1_Callback, this);
-    //  vicon_droneB_sub_ = priv_nh.subscribe("/vicon/DragonFly2/odom", 10, &multi_robot_tracking_Nodelet::vicon_drone2_Callback, this);
-    //  vicon_droneC_sub_ = priv_nh.subscribe("/vicon/DragonFly5/odom", 10, &multi_robot_tracking_Nodelet::vicon_drone5_Callback, this);
-
     image_pub_ = it.advertise("tracked_image",1);
-    //  pose_glass2drone_pub_ = priv_nh.advertise<nav_msgs::Odometry>("/test_detected_pose",1);
-    //  pose_glass2drone_proj_pub_ = priv_nh.advertise<nav_msgs::Odometry>("/test_projected_pose",1);
-
     tracked_pose_pub_ = nh.advertise<geometry_msgs::PoseArray>("tracked_pose_output",1);
     tracked_velocity_pub_ = nh.advertise<geometry_msgs::PoseArray>("tracked_velocity_output",1);
+
 
     //init export csv file
     outputFile.open("/home/marklee/rosbag/groundtruth_estimate_Asynch.csv");
