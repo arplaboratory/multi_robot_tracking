@@ -2,7 +2,7 @@
   <arg name="filter" default="phd" />
   <arg name="sim" default="false" />
   <arg name="num_drones" default="2" />
-  <arg name="config_file" default="snapdragon_flight.yaml" />
+  <arg name="config_file" default="params_snapdragon_flight.yaml" />
   
   <arg name="start_nodelet_manager" default="true" />
   <arg name="nodelet_manager_name" default="nodelet_manager_multi_tracking" />
@@ -13,7 +13,8 @@
   <group ns="/hummingbird0">
     <node pkg="nodelet" type="nodelet" name="$(arg nodelet_manager_name)" args="manager" output="screen" if="$(arg start_nodelet_manager)" />
     <node pkg="nodelet" type="nodelet" args="load multi_robot_tracking/multi_robot_tracking_Nodelet $(arg nodelet_manager_name)" name="multi_tracking" required="true" output="screen">
-      <rosparam file="$(find multi_robot_tracking)/config/params_snapdragon_flight.yaml"/>
+      <rosparam file="$(find multi_robot_tracking)/config/$(arg config_file)" unless="$(arg sim)"/>
+      <rosparam file="$(find multi_robot_tracking)/config/params_flightmare_sim.yaml" if="$(arg sim)"/>
       <param name="filter" value="$(arg filter)" />
       <param name="num_drones" value="$(arg num_drones)" />
     </node>
