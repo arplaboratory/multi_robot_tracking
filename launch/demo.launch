@@ -19,6 +19,9 @@
   <arg name="id_self" default="2" />
   <arg name="id_left" default="1" />
   <arg name="id_right" default="4" />
+  <arg name="camera_cx" default="329"/>
+  <arg name="camera_cy" default="243"/>
+  <arg name="camera_f" default="431"/>
   <arg name="start_nodelet_manager" default="true" />
   <arg name="nodelet_manager_name" default="nodelet_manager_multi_tracking" />
   <param name="filter" value="$(arg filter)" />

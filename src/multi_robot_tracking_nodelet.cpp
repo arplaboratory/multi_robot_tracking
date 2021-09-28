@@ -197,9 +197,9 @@ void multi_robot_tracking_Nodelet::init_matrices()
    * [0   0   1]
    */
 
-    cx = 329; //from HW
-    cy = 243;
-    f = 431;
+    // cx = 329; //from HW
+    // cy = 243;
+    // f = 431;
 
 
 
@@ -698,7 +698,9 @@ void multi_robot_tracking_Nodelet::onInit(void)
     priv_nh.param<int>("id_left",id_left,0);
     priv_nh.param<int>("id_right",id_right,0);
 
-    
+    priv_nh.param<float>("camera_cx", cx, 0);
+    priv_nh.param<float>("camera_cy", cy, 0);
+    priv_nh.param<float>("camera_f", f, 0);
 
 
     if(filter_to_use_.compare("phd") == 0) //using phd
