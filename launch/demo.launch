@@ -9,7 +9,9 @@
   <arg name="input_bbox_topic_sim" default="/hummingbird0/track/bounding_box"/> <!--/DragonPro3/snpe_ros/detections or  /hummingbird0/track/bounding_box-->
   <arg name="input_img_topic_sim" default="/hummingbird0/camera/rgb"/> <!-- /DragonPro3/image_publisher/image_raw or  /hummingbird0/camera/rgb -->
   <arg name="input_imu_topic_sim" default="/hummingbird0/imu"/> <!-- /DragonPro3/imu or /hummingbird0/imu-->
+  
   <arg name="num_drones" default="2" />
+  
   <arg name="init_pos_self_x" default="0.0" /> <!-- 60-60-60- equalateral traiangle w 2m side. currently hard-coded-->
   <arg name="init_pos_self_y" default="0.0" />
   <arg name="init_pos_x_left" default="3.4641" />
@@ -19,9 +21,16 @@
   <arg name="id_self" default="2" />
   <arg name="id_left" default="1" />
   <arg name="id_right" default="4" />
+  
   <arg name="camera_cx" default="329"/>
   <arg name="camera_cy" default="243"/>
   <arg name="camera_f" default="431"/>
+  
+  <arg name="viz_detection_height" default="168"/>
+  <arg name="viz_detection_width" default="224"/>
+  <arg name="viz_detection_offset_x" default="0"/>
+  <arg name="viz_detection_offset_y" default="28"/>
+
   <arg name="start_nodelet_manager" default="true" />
   <arg name="nodelet_manager_name" default="nodelet_manager_multi_tracking" />
   <param name="filter" value="$(arg filter)" />
@@ -42,6 +51,7 @@
       <param name="input_imu_topic" value="$(arg input_imu_topic)" unless="$(arg sim)" />
       
       <param name="num_drones" value="$(arg num_drones)" />
+
       <param name="init_pos_self_x" value="$(arg init_pos_self_x)" />
       <param name="init_pos_self_y" value="$(arg init_pos_self_y)" />
       <param name="init_pos_x_left" value="$(arg init_pos_x_left)" />
@@ -51,6 +61,11 @@
       <param name="id_self" value="$(arg id_self)" />
       <param name="id_left" value="$(arg id_left)" />
       <param name="id_right" value="$(arg id_right)" />
+
+      <param name="viz_detection_width" value="$(arg viz_detection_width)" />
+      <param name="viz_detection_height" value="$(arg viz_detection_height)" />
+      <param name="viz_detection_offset_x" value="$(arg viz_detection_offset_x)" />
+      <param name="viz_detection_offset_y" value="$(arg viz_detection_offset_y)" />
     </node>
   </group>
 

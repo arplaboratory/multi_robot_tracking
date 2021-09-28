@@ -140,12 +140,15 @@ public:
     //B matrix constants for ang velocity
     float cx, cy, f;
 
+    //Detection image frame 
+    int detection_height, detection_width;
+    int detection_offset_x, detection_offset_y;
+
+    //Camera frame size
+    int image_height, image_width;
+
     //output csv file
     ofstream outputFile;
-
-
-
-
 };
 
 
@@ -257,11 +260,14 @@ void multi_robot_tracking_Nodelet::draw_image()
     }
     else 
     {
+        float height_scale = (float)image_height / (float)detection_height;
+        float width_scale = (float)image_width / (float)detection_width;
+
         //scale 224x224 to 640x480
         for(int k=0; k < phd_filter_.X_k.cols(); k++)
         {
-            int scaledX = floor(phd_filter_.X_k(0,k) * 640 / 224.0);
-            int scaledY = floor((phd_filter_.X_k(1,k)-28) * 480 / 168.0);
+            int scaledX = floor((phd_filter_.X_k(0,k) - detection_offset_x) * width_scale);
+            int scaledY = floor((phd_filter_.X_k(1,k) - detection_offset_y) * height_scale);
 
             cv::Point2f target_center(scaledX,scaledY);
             cv::Point2f id_pos(scaledX,scaledY+10);
@@ -273,10 +279,10 @@ void multi_robot_tracking_Nodelet::draw_image()
         for (int k=0; k < phd_filter_.Z_k.cols(); k++)
         {
 
-            int scaledX = floor(phd_filter_.Z_k(0,k) * 640 / 224.0);
-            int scaledY = floor((phd_filter_.Z_k(1,k)-28) * 480 / 168.0);
-            float scaledW = phd_filter_.Z_k(2,k) * 640 / 224.0;
-            float scaledH = phd_filter_.Z_k(3,k) * 480 / 168.0;
+            int scaledX = floor((phd_filter_.Z_k(0,k) - detection_offset_x)) * width_scale);
+            int scaledY = floor((phd_filter_.Z_k(1,k) - detection_offset_y)) * height_scale);
+            float scaledW = phd_filter_.Z_k(2,k) * width_scale;
+            float scaledH = phd_filter_.Z_k(3,k) * height_scale;
 
 
             cv::Point2f measured_center(scaledX, scaledY);
@@ -289,23 +295,9 @@ void multi_robot_tracking_Nodelet::draw_image()
 
         }
     }
-
-    //  ROS_INFO("drawing ground truth");
-    //  for(int k=0; k < vicon_projected_2DposeArray.cols(); k++)
-    //  {
-    //    cv::Point2f target_center(vicon_projected_2DposeArray(0,k),vicon_projected_2DposeArray(1,k));
-    //    cv::Point2f id_pos(vicon_projected_2DposeArray(0,k),vicon_projected_2DposeArray(1,k)+10);
-    //    cv::circle(input_image,target_center,4, cv::Scalar(0, 255, 0), 2);
-    //    putText(input_image, to_string(k), id_pos, cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0, cvScalar(0, 255, 0), 2, CV_AA);//size 1.5 --> 0.5
-    //  }
-    // cv::imwrite("/home/greend/Desktop/0.png", input_image);
     image_msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", input_image).toImageMsg();
     image_msg->header.stamp = img_timestamp;
     image_pub_.publish(image_msg);
-
-    //  ROS_WARN("img time: %f",prev_img_timestamp.toSec());
-    //  ROS_WARN("bbox time: %f",bbox_timestamp.toSec());
-
 }
 
 
@@ -378,6 +370,8 @@ void multi_robot_tracking_Nodelet::image_Callback(const sensor_msgs::ImageConstP
             auto sync_image_ptr = image_buffer_[i];
             //store img pointer
             img_timestamp = image_buffer_[i]->header.stamp;
+            image_height = image_buffer_[i]->height;
+            image_width = image_buffer_[i]->width;
             cv_bridge::CvImageConstPtr im_ptr_ = cv_bridge::toCvShare(sync_image_ptr, "rgb8");
             input_image = im_ptr_->image;
 
@@ -701,6 +695,11 @@ void multi_robot_tracking_Nodelet::onInit(void)
     priv_nh.param<float>("camera_cx", cx, 0);
     priv_nh.param<float>("camera_cy", cy, 0);
     priv_nh.param<float>("camera_f", f, 0);
+
+    priv_nh.param<int>("viz_detection_height", detection_height, 168);
+    priv_nh.param<int>("viz_detection_width", detection_width, 224);
+    priv_nh.param<int>("viz_detection_offset_x", detection_offset_x, 0);
+    priv_nh.param<int>("viz_detection_offset_y", detection_offset_y, 28);
 
 
     if(filter_to_use_.compare("phd") == 0) //using phd
