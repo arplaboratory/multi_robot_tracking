@@ -15,6 +15,8 @@ id_right: 4
 camera_cx: 329
 camera_cy: 243
 camera_f: 431
+
+dt: 0.225
   
 viz_detection_height: 168
 viz_detection_width: 224
