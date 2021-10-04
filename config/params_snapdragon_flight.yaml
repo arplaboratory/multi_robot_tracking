@@ -22,3 +22,5 @@ viz_detection_height: 168
 viz_detection_width: 224
 viz_detection_offset_x: 0
 viz_detection_offset_y: 28
+
+enable_async_pdf: true

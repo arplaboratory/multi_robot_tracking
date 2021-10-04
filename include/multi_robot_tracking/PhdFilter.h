@@ -63,6 +63,7 @@ class PhdFilter
 
   int k_iteration = 0;
   bool flag_asynch_start = false;
+  bool enable_async = true;
 
 
   //kalman filter variables

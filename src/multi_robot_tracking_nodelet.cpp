@@ -142,6 +142,8 @@ public:
 
     float filter_dt;
 
+    bool enable_async_pdf;
+
     //Detection image frame 
     int detection_height, detection_width;
     int detection_offset_x, detection_offset_y;
@@ -704,11 +706,14 @@ void multi_robot_tracking_Nodelet::onInit(void)
     priv_nh.param<int>("viz_detection_offset_x", detection_offset_x, 0);
     priv_nh.param<int>("viz_detection_offset_y", detection_offset_y, 28);
 
+    priv_nh.param<bool>("enable_async_pdf", enable_async_pdf, true);
+
 
     if(filter_to_use_.compare("phd") == 0) //using phd
     {
         ROS_WARN("will be using: %s", filter_to_use_.c_str());
         init_matrices(); //initialize matrix for storing 3D pose
+        phd_filter_.enable_async = enable_async_pdf;
         //associate_consensus(); //determine 2d position from known init positions
 
     }

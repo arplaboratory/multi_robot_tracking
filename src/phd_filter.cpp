@@ -149,9 +149,14 @@ void PhdFilter::initialize()
 */
 void PhdFilter::asynchronous_predict_existing()
 {
+    // Disable async - Feature recomended by rundong
+    if(!enable_async)
+    {
+        return;
+    }
+
     //update dt
-
-
+    
     //update F
     update_F_matrix(dt_imu);
 
