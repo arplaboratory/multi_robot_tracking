@@ -41,7 +41,7 @@ void PhdFilter::phd_track()
 }
 
 
-void PhdFilter::initialize_matrix()
+void PhdFilter::initialize_matrix(float cam_cu, float cam_cv, float cam_f, float meas_dt)
 {
     ROS_INFO("first initialize matrix");
     //initialize
@@ -84,6 +84,11 @@ void PhdFilter::initialize_matrix()
     B = Eigen::MatrixXf::Zero(4,3*NUM_DRONES);
 
     mk_k_minus_1_beforePrediction = Eigen::MatrixXf::Zero(4,NUM_DRONES);
+
+    cu = cam_cu;
+    cv = cam_cv;
+    f = cam_f;
+    dt = meas_dt;
 }
 
 void PhdFilter::set_num_drones(int num_drones_in)
@@ -181,13 +186,13 @@ void PhdFilter::asynchronous_predict_existing()
     Eigen::MatrixXf F_modified;
     F_modified = Eigen::MatrixXf(4,4);
 
-    float cu = 329; //from flightmare simulation
-    float cv = 243;
-    float f = 431;
+    // cu = 329; //from flightmare simulation
+    // cv = 243;
+    // f = 431;
     float omega_x = ang_vel_k(0);
     float omega_y = ang_vel_k(1);
     float omega_z = ang_vel_k(2);
-    float dt = 0.225;
+    // float dt = 0.225;
     float pu = 0;
     float pv = 0;
 
@@ -253,7 +258,7 @@ void PhdFilter::phd_predict_existing()
     {
         P_temp = Pk_minus_1.block<4,4>(0,4*j);
         P_temp = Q + F* P_temp * F.transpose();
-        Pk_minus_1.block<4,4>(0,4*j) = P_temp;
+        Pk_minus_1.block<4,4>(0,4*j) = P_temp; 
     }
 
     //     cout << "P: " << endl << Pk_minus_1 << endl;
@@ -369,7 +374,7 @@ void PhdFilter::phd_update()
             cov_pdf = S.block<2,2>(0,4*j);
             w_new_exponent = -0.5 * meanDelta_pdf.transpose() * cov_pdf.inverse() * meanDelta_pdf ;
 
-            double w_val = wk_k_minus_1(j) * pow(2*PI, -1) * pow(cov_pdf.determinant(),-0.5) * exp(w_new_exponent(0,0));
+            double w_val = wk_k_minus_1(j) * pow(2*PI, -1/2) * pow(cov_pdf.determinant(),-0.5) * exp(w_new_exponent(0,0));
             wk(index)= w_val;
 
 
@@ -543,10 +548,10 @@ void PhdFilter::phd_prune()
         for(int i = 0; i <update_counter; i++  )
         {
             newIndex(i) = int(indexOrder(i))%numTargets_Jk_k_minus_1;
-            if(newIndex(i) == 0)
-            {
-                newIndex(i) = 0; //unncessary bc index starts at 0
-            }
+            // if(newIndex(i) == 0)
+            // {
+            //     newIndex(i) = 0; //unncessary bc index starts at 0
+            // }
         }
 
         for(int i = 0; i <update_counter; i++  )
@@ -629,12 +634,6 @@ void PhdFilter::phd_state_extract()
     }
 
     X_k_previous = X_k;
-
-
-
-
-
-
 }
 
 
@@ -656,7 +655,7 @@ float PhdFilter::clutter_intensity(const float ZmeasureX, const float ZmeasureY)
     else if (ZmeasureY > yMax) return 0;
     else
     {
-        uniform_dist = 1 / ( (xMax - xMin)*(yMax - yMin) );
+        uniform_dist = 1 / ( (xMax - xMin)*(yMax - yMin) ); // Convert this to a constant initialized at startup
 
     }
 

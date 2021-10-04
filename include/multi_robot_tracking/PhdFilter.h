@@ -30,7 +30,7 @@ class PhdFilter
  public:
   PhdFilter();
 
-  void initialize_matrix();
+  void initialize_matrix(float cam_cu, float cam_cv, float cam_f, float meas_dt=0.225);
   void phd_track();
   void phd_predict_existing();
   void phd_construct();
@@ -114,6 +114,8 @@ class PhdFilter
   cv::Mat input_image;
   sensor_msgs::ImagePtr image_msg;
 
+  float cu, cv, f;
+  float dt;
 
  private:
 

@@ -140,6 +140,8 @@ public:
     //B matrix constants for ang velocity
     float cx, cy, f;
 
+    float filter_dt;
+
     //Detection image frame 
     int detection_height, detection_width;
     int detection_offset_x, detection_offset_y;
@@ -279,8 +281,8 @@ void multi_robot_tracking_Nodelet::draw_image()
         for (int k=0; k < phd_filter_.Z_k.cols(); k++)
         {
 
-            int scaledX = floor((phd_filter_.Z_k(0,k) - detection_offset_x)) * width_scale);
-            int scaledY = floor((phd_filter_.Z_k(1,k) - detection_offset_y)) * height_scale);
+            int scaledX = floor((phd_filter_.Z_k(0,k) - detection_offset_x) * width_scale);
+            int scaledY = floor((phd_filter_.Z_k(1,k) - detection_offset_y) * height_scale);
             float scaledW = phd_filter_.Z_k(2,k) * width_scale;
             float scaledH = phd_filter_.Z_k(3,k) * height_scale;
 
@@ -380,7 +382,7 @@ void multi_robot_tracking_Nodelet::image_Callback(const sensor_msgs::ImageConstP
             draw_image();
 
             //remove from img buffer
-            // image_buffer_.erase(image_buffer_.begin() + i);
+            // image_buffer_.erase(image_buffer_.begin() + i); // ToDo: Vivek needs to check for possible bug ?? 
 
             break;
         }
@@ -496,7 +498,7 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
         if(phd_filter_.first_callback)
         {
             phd_filter_.set_num_drones(num_drones);
-            phd_filter_.initialize_matrix();
+            phd_filter_.initialize_matrix(cx, cy, f, filter_dt);
         }
 
 
@@ -607,7 +609,7 @@ void multi_robot_tracking_Nodelet::consensus_sort()
             id_consensus(z) = int(id_array_init(min_index));
 
         }
-
+        
         //sort ID accordingly
         consensus_sort_complete = true;
         cout << " **************** consensus ID: " << id_consensus  << "**************** " << endl;
@@ -695,6 +697,7 @@ void multi_robot_tracking_Nodelet::onInit(void)
     priv_nh.param<float>("camera_cx", cx, 0);
     priv_nh.param<float>("camera_cy", cy, 0);
     priv_nh.param<float>("camera_f", f, 0);
+    priv_nh.param<float>("dt", filter_dt, 0.225);
 
     priv_nh.param<int>("viz_detection_height", detection_height, 168);
     priv_nh.param<int>("viz_detection_width", detection_width, 224);
