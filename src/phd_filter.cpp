@@ -177,7 +177,7 @@ void PhdFilter::asynchronous_predict_existing()
         ang_vel_temp= B.block<4,3>(0,3*i) * ang_vel_k;
         //      cout << "Bu: " << endl << ang_vel_temp << endl;
         // Ax + Bu
-        mk_minus_1.block<4,1>(0,i) = F * mk_minus_1.block<4,1>(0,i) ;//+ ang_vel_temp;
+        mk_minus_1.block<4,1>(0,i) = F * mk_minus_1.block<4,1>(0,i) + ang_vel_temp;
     }
 
 //    % F =
