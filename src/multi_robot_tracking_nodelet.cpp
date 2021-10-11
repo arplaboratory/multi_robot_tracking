@@ -112,21 +112,10 @@ public:
 
 
     //3D matrices for transform
-    Eigen::MatrixXf droneA_3Dpose4x1;
-    Eigen::MatrixXf droneB_3Dpose4x1;
-    Eigen::MatrixXf droneC_3Dpose4x1;
-    Eigen::MatrixXf glasses_3Dpose4x4;
-    Eigen::MatrixXf glasses_3Dpose3x4;
     Eigen::MatrixXf rotm_world2cam;
-    Eigen::MatrixXf rotm_glassesOffset;
     Eigen::MatrixXf Hmatfiller1x4;
     Eigen::MatrixXf k_matrix3x3;
     Eigen::MatrixXf k_matrix3x3_inv;
-    Eigen::MatrixXf vicon_projectedA_2Dpose3x1;
-    Eigen::MatrixXf vicon_projectedB_2Dpose3x1;
-    Eigen::MatrixXf vicon_projectedC_2Dpose3x1;
-
-    Eigen::MatrixXf vicon_projected_2DposeArray;
 
     //init world coordinates for consensus
     Eigen::MatrixXf positions_world_coordinate;
@@ -160,18 +149,8 @@ void multi_robot_tracking_Nodelet::init_matrices()
 {
     ROS_INFO("init matrix for drone num: %d",num_drones);
     ROS_WARN("nodelet start init matrix... verify cam K matrix for simulation or snapdragon pro!");
-    droneA_3Dpose4x1 = Eigen::MatrixXf(4,1);
-    droneB_3Dpose4x1 = Eigen::MatrixXf(4,1);
-    droneC_3Dpose4x1 = Eigen::MatrixXf(4,1);
-    glasses_3Dpose4x4 = Eigen::MatrixXf(4,4);
-    glasses_3Dpose3x4 = Eigen::MatrixXf(3,4);
     k_matrix3x3 = Eigen::MatrixXf(3,3);
     k_matrix3x3_inv = Eigen::MatrixXf(3,3);
-    vicon_projectedA_2Dpose3x1 = Eigen::MatrixXf(3,1);
-    vicon_projectedB_2Dpose3x1 = Eigen::MatrixXf(3,1);
-    vicon_projectedC_2Dpose3x1 = Eigen::MatrixXf(3,1);
-
-    vicon_projected_2DposeArray = Eigen::MatrixXf(3,num_drones);
 
     positions_world_coordinate =  Eigen::MatrixXf(3,num_drones);
     positions_cam_coordinate =  Eigen::MatrixXf(3,num_drones);
@@ -181,43 +160,21 @@ void multi_robot_tracking_Nodelet::init_matrices()
     id_consensus = Eigen::MatrixXd(1,num_drones);
     id_array_init = Eigen::MatrixXd(1,num_drones);
 
-    //id_array_init(0) = id_left;
-    //id_array_init(1) = id_right;
+    id_array_init(0) = id_left;
+    id_array_init(1) = id_right;
 
 
-    Hmatfiller1x4 = Eigen::MatrixXf(1,4);
     rotm_world2cam = Eigen::MatrixXf(3,3);
-    rotm_glassesOffset = Eigen::MatrixXf(3,3);
-
-    /* [559 0 490] from tobii glass maxim's masters thesis.
-   * [0 558 273]
-   * [0   0   1]
-   */
-
-    /* [431 0 329] from snapdragon_pro board2.
-   * [0 431 243]
-   * [0   0   1]
-   */
-
-    /* [120 0 180] from flightmare simulation
-   * [0 120 120]
-   * [0   0   1]
-   */
 
     // cx = 329; //from HW
     // cy = 243;
     // f = 431;
-
-
 
     k_matrix3x3(0,0) = f; k_matrix3x3(0,1) = 0;   k_matrix3x3(0,2) = cx;
     k_matrix3x3(1,0) = 0;   k_matrix3x3(1,1) = f; k_matrix3x3(1,2) = cy;
     k_matrix3x3(2,0) = 0;   k_matrix3x3(2,1) = 0;   k_matrix3x3(2,2) = 1;
 
     k_matrix3x3_inv = k_matrix3x3.inverse();
-
-    // [ 0 0 0 1 ]
-    Hmatfiller1x4(0,0) = 0;  Hmatfiller1x4(0,1) = 0; Hmatfiller1x4(0,2) = 0; Hmatfiller1x4(0,3) = 1;
 
     /* [0 -1  0]
    * [0  0 -1]
@@ -240,7 +197,7 @@ void multi_robot_tracking_Nodelet::init_matrices()
 void multi_robot_tracking_Nodelet::draw_image()
 {
 
-    if(filter_to_use_.compare("jpdaf") == 0) // Does not work
+    if(filter_to_use_.compare("jpdaf") == 0)
     {
         //          ROS_INFO("drawing jpdaf estimation");
         for(int k=0; k < jpdaf_filter_.tracks_.size(); k++)
@@ -261,17 +218,20 @@ void multi_robot_tracking_Nodelet::draw_image()
             line(input_image, det_cross_a, det_cross_d, cv::Scalar(255, 20, 150), 1, 1 );
             line(input_image, det_cross_b, det_cross_c, cv::Scalar(255, 20, 150), 1, 1 );
         }
+
+
     }
-    else 
-    {
-        float height_scale = (float)image_height / (float)detection_height;
-        float width_scale = (float)image_width / (float)detection_width;
+
+    else {
 
         //scale 224x224 to 640x480
+
+
+//        ROS_INFO("drawing phd estimation");
         for(int k=0; k < phd_filter_.X_k.cols(); k++)
         {
-            int scaledX = floor((phd_filter_.X_k(0,k) - detection_offset_x) * width_scale);
-            int scaledY = floor((phd_filter_.X_k(1,k) - detection_offset_y) * height_scale);
+            int scaledX = floor(phd_filter_.X_k(0,k) * 640 / 224.0);
+            int scaledY = floor((phd_filter_.X_k(2,k)-28) * 480 / 168.0);
 
             cv::Point2f target_center(scaledX,scaledY);
             cv::Point2f id_pos(scaledX,scaledY+10);
@@ -283,10 +243,10 @@ void multi_robot_tracking_Nodelet::draw_image()
         for (int k=0; k < phd_filter_.Z_k.cols(); k++)
         {
 
-            int scaledX = floor((phd_filter_.Z_k(0,k) - detection_offset_x) * width_scale);
-            int scaledY = floor((phd_filter_.Z_k(1,k) - detection_offset_y) * height_scale);
-            float scaledW = phd_filter_.Z_k(2,k) * width_scale;
-            float scaledH = phd_filter_.Z_k(3,k) * height_scale;
+            int scaledX = floor(phd_filter_.Detections(0,k) * 640 / 224.0);
+            int scaledY = floor((phd_filter_.Detections(1,k)-28) * 480 / 168.0);
+            float scaledW = phd_filter_.Detections(2,k) * 640 / 224.0;
+            float scaledH = phd_filter_.Detections(3,k) * 480 / 168.0;
 
 
             cv::Point2f measured_center(scaledX, scaledY);
@@ -299,9 +259,23 @@ void multi_robot_tracking_Nodelet::draw_image()
 
         }
     }
+
+    //  ROS_INFO("drawing ground truth");
+    //  for(int k=0; k < vicon_projected_2DposeArray.cols(); k++)
+    //  {
+    //    cv::Point2f target_center(vicon_projected_2DposeArray(0,k),vicon_projected_2DposeArray(1,k));
+    //    cv::Point2f id_pos(vicon_projected_2DposeArray(0,k),vicon_projected_2DposeArray(1,k)+10);
+    //    cv::circle(input_image,target_center,4, cv::Scalar(0, 255, 0), 2);
+    //    putText(input_image, to_string(k), id_pos, cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0, cvScalar(0, 255, 0), 2, CV_AA);//size 1.5 --> 0.5
+    //  }
+    // cv::imwrite("/home/greend/Desktop/0.png", input_image);
     image_msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", input_image).toImageMsg();
     image_msg->header.stamp = img_timestamp;
     image_pub_.publish(image_msg);
+
+    //  ROS_WARN("img time: %f",prev_img_timestamp.toSec());
+    //  ROS_WARN("bbox time: %f",bbox_timestamp.toSec());
+
 }
 
 
@@ -324,7 +298,6 @@ void multi_robot_tracking_Nodelet::ground_truth_Callback(const geometry_msgs::Po
                 //store Z
                 temp_groundtruth(0,i) = in_PoseArray.poses[i].position.x;
                 temp_groundtruth(1,i) = in_PoseArray.poses[i].position.y;
-
             }
 
             //store X_k value
@@ -333,7 +306,6 @@ void multi_robot_tracking_Nodelet::ground_truth_Callback(const geometry_msgs::Po
                 //store Z
                 temp_estimation(0,i) = phd_filter_.X_k(0,i);
                 temp_estimation(1,i) = phd_filter_.X_k(1,i);
-
             }
 
             //store into csv
@@ -370,21 +342,18 @@ void multi_robot_tracking_Nodelet::image_Callback(const sensor_msgs::ImageConstP
         {
             ROS_INFO("detection timestamp: %f, image buff[i].stamp: %f", current_timestamp, image_buffer_[i]->header.stamp.toSec() );
             ROS_INFO("FOUND IMG match");
-            cout << "matched image buff index" << i << endl;
+            cout << "matched image buff index" << i << " Buffer Size: " << image_buffer_.size() <<endl;
             auto sync_image_ptr = image_buffer_[i];
             //store img pointer
             img_timestamp = image_buffer_[i]->header.stamp;
-            image_height = image_buffer_[i]->height;
-            image_width = image_buffer_[i]->width;
             cv_bridge::CvImageConstPtr im_ptr_ = cv_bridge::toCvShare(sync_image_ptr, "rgb8");
             input_image = im_ptr_->image;
 
             //draw image with matched image
-
             draw_image();
 
             //remove from img buffer
-            // image_buffer_.erase(image_buffer_.begin() + i); // ToDo: Vivek needs to check for possible bug ?? 
+            //image_buffer_.erase(image_buffer_.begin() + i);
 
             break;
         }
@@ -398,28 +367,20 @@ void multi_robot_tracking_Nodelet::image_Callback(const sensor_msgs::ImageConstP
  */
 void multi_robot_tracking_Nodelet::imu_Callback(const sensor_msgs::ImuConstPtr &imu_msg)
 {
-//    ROS_INFO("imu cb");
-    sensor_imu_buffer_.push_back(*imu_msg);
-
-    if(sensor_imu_buffer_.size() > 5)
-    {
-        sensor_imu_buffer_.erase(sensor_imu_buffer_.begin());
-    }
-
     //use imu buffer
-    sensor_msgs::Imu prevImu = sensor_imu_buffer_[0];
-    imu_timestamp = prevImu.header.stamp;
-    imu_time = imu_timestamp.toSec();
-    //ROS_WARN("bbox time: %f, dt: %f, imu time: %f",current_timestamp, delta_timestamp, imu_time);
+    
+    ros::Duration timeDifIMU = imu_msg->header.stamp - imu_timestamp;
+    phd_filter_.dt_imu = timeDifIMU.toSec();
+    ROS_WARN("imu time: %f", phd_filter_.dt_imu);
 
     if(phd_filter_.first_callback == false)
     {
-        phd_filter_.ang_vel_k(0) = prevImu.angular_velocity.x;
-        phd_filter_.ang_vel_k(1) = prevImu.angular_velocity.y;
-        phd_filter_.ang_vel_k(2) = prevImu.angular_velocity.z;
+        phd_filter_.ang_vel_k(0) = imu_msg->angular_velocity.x;
+        phd_filter_.ang_vel_k(1) = imu_msg->angular_velocity.y;
+        phd_filter_.ang_vel_k(2) = imu_msg->angular_velocity.z;
 
         //apply rotation from imu2cam frame
-        phd_filter_.ang_vel_k.block<3,1>(0,0) = rotm_world2cam *  phd_filter_.ang_vel_k * phd_filter_.dt_imu;
+        phd_filter_.ang_vel_k.block<3,1>(0,0) = rotm_world2cam *  phd_filter_.ang_vel_k;
 
         //asynchronous motion prediction
         if(first_track_flag)
@@ -430,6 +391,7 @@ void multi_robot_tracking_Nodelet::imu_Callback(const sensor_msgs::ImuConstPtr &
         }
 
     }
+    imu_timestamp = imu_msg->header.stamp;
 
 //    ROS_INFO("end of imu cb");
 
@@ -441,8 +403,8 @@ Eigen::MatrixXf multi_robot_tracking_Nodelet::get_B_ang_vel_matrix(float x, floa
     temp_B_matrix = Eigen::MatrixXf::Zero(4,3);
 
     temp_B_matrix(0,0) = (x-cx)*(y-cy)/f;       temp_B_matrix(0,1) = -(pow((x-cx),2)/f)-f;  temp_B_matrix(0,2) = (y-cy);
-    temp_B_matrix(1,0) = f+(pow((y-cy),2))/f;   temp_B_matrix(1,1) = (x-cx)*(y-cy)/f;       temp_B_matrix(1,2) = -x+cx;
-    temp_B_matrix(2,0) = 0;                     temp_B_matrix(2,1) = 0;                     temp_B_matrix(2,2) = 0;
+    temp_B_matrix(1,0) = 0;                     temp_B_matrix(1,1) = 0;                     temp_B_matrix(1,2) = 0;
+    temp_B_matrix(2,0) = f+(pow((y-cy),2))/f;   temp_B_matrix(2,1) = (x-cx)*(y-cy)/f;       temp_B_matrix(2,2) = -x+cx;
     temp_B_matrix(3,0) = 0;                     temp_B_matrix(3,1) = 0;                     temp_B_matrix(3,2) = 0;
 
     temp_B_matrix = temp_B_matrix * phd_filter_.dt_imu;
@@ -457,6 +419,12 @@ Eigen::MatrixXf multi_robot_tracking_Nodelet::get_B_ang_vel_matrix(float x, floa
  */
 void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseArray& in_PoseArray)
 {
+    if(in_PoseArray.poses.size() > num_drones)
+    {
+        ROS_ERROR("MORE DETECTIONS THAN NO OF DRONES !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+        return;
+    }
+
     //get time of detection
     bbox_timestamp = in_PoseArray.header.stamp;
     current_timestamp = bbox_timestamp.toSec();
@@ -505,8 +473,6 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
 
 
         phd_filter_.detected_size_k = in_PoseArray.poses.size();
-        phd_filter_.Z_k = Eigen::MatrixXf::Zero(4,phd_filter_.detected_size_k);
-
 
         for(int i =0; i < phd_filter_.detected_size_k; i++)
         {
@@ -514,8 +480,11 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
             // x, y, w, h
             phd_filter_.Z_k(0,i) = in_PoseArray.poses[i].position.x;
             phd_filter_.Z_k(1,i) = in_PoseArray.poses[i].position.y;
-            phd_filter_.Z_k(2,i) = in_PoseArray.poses[i].orientation.x;
-            phd_filter_.Z_k(3,i) = in_PoseArray.poses[i].orientation.y;
+
+            phd_filter_.Detections(0,i) = in_PoseArray.poses[i].position.x;
+            phd_filter_.Detections(1,i) = in_PoseArray.poses[i].position.y;
+            phd_filter_.Detections(2,i) = in_PoseArray.poses[i].orientation.x;
+            phd_filter_.Detections(3,i) = in_PoseArray.poses[i].orientation.y;
         }
 
         cout << "Z_k_CB: " << endl << phd_filter_.Z_k << endl;
@@ -541,6 +510,10 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
 
             phd_filter_.dt_cam = delta_timestamp;
             previous_timestamp = current_timestamp;
+            for(int i =0; i < phd_filter_.X_k.cols(); i++)
+            {
+                phd_filter_.B.block<4,3>(0,3*i) = get_B_ang_vel_matrix(phd_filter_.X_k(0,i),phd_filter_.X_k(2,i));
+            }
 
             phd_filter_.phd_track();
             first_track_flag = true;
@@ -559,14 +532,7 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
 
             //update for B ang vel matrix
             //store B matrix for ang velocity
-            for(int i =0; i < phd_filter_.X_k.cols(); i++)
-            {
-
-        //            phd_filter_.B.block<4,3>(0,3*i) = get_B_ang_vel_matrix(phd_filter_.Z_k(0,i),phd_filter_.Z_k(1,i));
-                phd_filter_.B.block<4,3>(0,3*i) = get_B_ang_vel_matrix(phd_filter_.X_k(0,i),phd_filter_.X_k(1,i));
-
-
-            }
+            
 
             consensus_sort();
 
@@ -607,17 +573,70 @@ void multi_robot_tracking_Nodelet::consensus_sort()
                     min_index = index;
                 }
             }
-
             id_consensus(z) = int(id_array_init(min_index));
 
         }
-        
+
         //sort ID accordingly
         consensus_sort_complete = true;
         cout << " **************** consensus ID: " << id_consensus  << "**************** " << endl;
     }
 
 }
+
+
+/*
+ *
+ */
+void multi_robot_tracking_Nodelet::associate_consensus()
+{
+    //ROS_WARN("inside consensus func");
+
+    //get delta init positions in world coordinate
+    Eigen::MatrixXf delta_left_to_self, delta_right_to_self;
+    Eigen::MatrixXf projected_2d_padding;
+    delta_left_to_self = Eigen::MatrixXf::Zero(3,1);
+    delta_right_to_self = Eigen::MatrixXf::Zero(3,1);
+    projected_2d_padding = Eigen::MatrixXf::Zero(3,num_drones);
+
+    //delta_left_to_self(0) = init_pos_x_left - init_pos_self_x;
+    //delta_left_to_self(1) = init_pos_y_left - init_pos_self_y;
+    delta_left_to_self(0) = 3.4641;
+    delta_left_to_self(1) = 2;
+    delta_left_to_self(2) = 0;
+
+    //    delta_right_to_self(0) = init_pos_x_right - init_pos_self_x;
+    //    delta_right_to_self(1) = init_pos_y_right - init_pos_self_y;
+    delta_right_to_self(0) = 3.4641;
+    delta_right_to_self(1) = -2;
+    delta_right_to_self(2) = 0;
+
+    cout << "deltaL: " << endl << delta_left_to_self << endl;
+    cout << "deltaR: " << endl << delta_right_to_self << endl;
+
+    positions_world_coordinate.block<3,1>(0,0) = delta_left_to_self;
+    positions_world_coordinate.block<3,1>(0,1) = delta_right_to_self;
+
+    //get delta init positions in camera coordinate
+    positions_cam_coordinate.block<3,1>(0,0) = rotm_world2cam * positions_world_coordinate.block<3,1>(0,0) ;
+    positions_cam_coordinate.block<3,1>(0,1) = rotm_world2cam * positions_world_coordinate.block<3,1>(0,1) ;
+
+    cout << "positions_cam_coordinate: " << endl << positions_cam_coordinate << endl;
+
+
+    //project into 2D space
+    for(int i =0; i < num_drones;i++)
+    {
+        projected_2d_padding.block<3,1>(0,i) = k_matrix3x3 * positions_cam_coordinate.block<3,1>(0,i);
+        projected_2d_padding.block<3,1>(0,i) = projected_2d_padding.block<3,1>(0,i) / projected_2d_padding(2,i);
+        projected_2d_initial_coord.block<2,1>(0,i) = projected_2d_padding.block<2,1>(0,i);
+    }
+
+    cout << "projected_2d_initial_coord: " << endl << projected_2d_initial_coord << endl;
+
+
+}
+
 
 void multi_robot_tracking_Nodelet::publish_tracks()
 {
@@ -679,11 +698,11 @@ void multi_robot_tracking_Nodelet::onInit(void)
     image_transport::ImageTransport it(nh);
 
     priv_nh.param<std::string>("filter",filter_to_use_,"phd"); //store which filter to use
-    priv_nh.param<std::string>("input_bbox_topic",input_bbox_topic,"/DragonPro3/snpe_ros/detections"); //input bbox topic
-    priv_nh.param<std::string>("input_img_topic",input_img_topic,"DragonPro3/image_publisher/image_raw"); //input img topic
-    priv_nh.param<std::string>("input_imu_topic",input_imu_topic,"/DragonPro3/imu"); //input imu topic
+    priv_nh.param<std::string>("input_bbox_topic",input_bbox_topic,"/DragonPro1/snpe_ros/detections"); //input bbox topic
+    priv_nh.param<std::string>("input_img_topic",input_img_topic,"DragonPro1/image_publisher/image_raw"); //input img topic
+    priv_nh.param<std::string>("input_imu_topic",input_imu_topic,"/DragonPro1/imu"); //input imu topic
 
-    priv_nh.param<int>("num_drones",num_drones,1);
+    priv_nh.param<int>("num_drones",num_drones,2);
 
     //consensus - init coordinates read in from launch file
     priv_nh.param<float>("init_pos_self_x",init_pos_self_x,0);
@@ -706,14 +725,12 @@ void multi_robot_tracking_Nodelet::onInit(void)
     priv_nh.param<int>("viz_detection_offset_x", detection_offset_x, 0);
     priv_nh.param<int>("viz_detection_offset_y", detection_offset_y, 28);
 
-    priv_nh.param<bool>("enable_async_pdf", enable_async_pdf, true);
 
 
     if(filter_to_use_.compare("phd") == 0) //using phd
     {
         ROS_WARN("will be using: %s", filter_to_use_.c_str());
         init_matrices(); //initialize matrix for storing 3D pose
-        phd_filter_.enable_async = enable_async_pdf;
         //associate_consensus(); //determine 2d position from known init positions
 
     }
@@ -741,7 +758,6 @@ void multi_robot_tracking_Nodelet::onInit(void)
     image_pub_ = it.advertise("tracked_image",1);
     tracked_pose_pub_ = nh.advertise<geometry_msgs::PoseArray>("tracked_pose_output",1);
     tracked_velocity_pub_ = nh.advertise<geometry_msgs::PoseArray>("tracked_velocity_output",1);
-
 
     //init export csv file
     outputFile.open("/home/marklee/rosbag/groundtruth_estimate_Asynch.csv");

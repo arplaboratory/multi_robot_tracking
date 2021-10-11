@@ -15,13 +15,7 @@ void PhdFilter::phd_track()
 {
     startTime = ros::Time::now();
     k_iteration = k_iteration + 1;
-    ROS_INFO("iter: %d",k_iteration);
-
-    //predict existing
-    if(flag_asynch_start) (asynchronous_predict_existing());
-    else phd_predict_existing();
-
-    phd_predict_existing();
+    ROS_DEBUG("iter: %d",k_iteration);
 
     //construct
     phd_construct();
@@ -32,9 +26,6 @@ void PhdFilter::phd_track()
     //state extraction
     phd_state_extract();
 
-    //draw track on image
-    //draw_image();
-
     endTime = ros::Time::now();
     ROS_WARN("end of track iteration");
 
@@ -43,52 +34,54 @@ void PhdFilter::phd_track()
 
 void PhdFilter::initialize_matrix(float cam_cu, float cam_cv, float cam_f, float meas_dt)
 {
-    ROS_INFO("first initialize matrix");
+    ROS_DEBUG("first initialize matrix");
     //initialize
-    Z_k = Eigen::MatrixXf::Zero(4,NUM_DRONES);
-    Z_k_previous = Eigen::MatrixXf::Zero(4,NUM_DRONES);
-    ang_vel_k = Eigen::MatrixXf::Zero(3,1);
+    Z_k = Eigen::MatrixXf::Zero(n_meas,NUM_DRONES);
+    Z_k_previous = Eigen::MatrixXf::Zero(n_meas,NUM_DRONES);
+    ang_vel_k = Eigen::MatrixXf::Zero(n_input,1);
 
-    mk_minus_1 = Eigen::MatrixXf::Zero(4,NUM_DRONES);
+    mk_minus_1 = Eigen::MatrixXf::Zero(n_state,NUM_DRONES);
     wk_minus_1 = Eigen::MatrixXf::Zero(1,NUM_DRONES);
-    Pk_minus_1 = Eigen::MatrixXf::Zero(4,NUM_DRONES*4);
+    Pk_minus_1 = Eigen::MatrixXf::Zero(n_state,NUM_DRONES*4);
 
-    mk = Eigen::MatrixXf::Zero(4,NUM_DRONES+NUM_DRONES*NUM_DRONES);
+    mk = Eigen::MatrixXf::Zero(n_state,NUM_DRONES+NUM_DRONES*NUM_DRONES);
     wk = Eigen::MatrixXf::Zero(1,NUM_DRONES+NUM_DRONES*NUM_DRONES);
-    Pk = Eigen::MatrixXf::Zero(4,4*(NUM_DRONES+NUM_DRONES*NUM_DRONES) );
+    Pk = Eigen::MatrixXf::Zero(n_state,n_state*(NUM_DRONES+NUM_DRONES*NUM_DRONES) );
 
-    mk_bar = Eigen::MatrixXf::Zero(4,NUM_DRONES);
+    mk_bar = Eigen::MatrixXf::Zero(n_state,NUM_DRONES);
     wk_bar = Eigen::MatrixXf::Zero(1,NUM_DRONES);
-    Pk_bar = Eigen::MatrixXf::Zero(4,4*NUM_DRONES);
+    Pk_bar = Eigen::MatrixXf::Zero(n_state,n_state*NUM_DRONES);
 
-    mk_bar_fixed = Eigen::MatrixXf::Zero(4,NUM_DRONES);
+    mk_bar_fixed = Eigen::MatrixXf::Zero(n_state,NUM_DRONES);
     wk_bar_fixed = Eigen::MatrixXf::Zero(1,NUM_DRONES);
-    Pk_bar_fixed = Eigen::MatrixXf::Zero(4,4*NUM_DRONES);
+    Pk_bar_fixed = Eigen::MatrixXf::Zero(n_state,n_state*NUM_DRONES);
 
-
-
-    mk_k_minus_1 = Eigen::MatrixXf::Zero(4,NUM_DRONES);
+    mk_k_minus_1 = Eigen::MatrixXf::Zero(n_state,NUM_DRONES);
     wk_k_minus_1 = Eigen::MatrixXf::Zero(1,NUM_DRONES);
-    Pk_k_minus_1 = Eigen::MatrixXf::Zero(4,4*NUM_DRONES);
-    P_k_k = Eigen::MatrixXf::Zero(4,4*NUM_DRONES);
-    S = Eigen::MatrixXf::Zero(4,4*NUM_DRONES);
+    Pk_k_minus_1 = Eigen::MatrixXf::Zero(n_state,n_state*NUM_DRONES);
+    P_k_k = Eigen::MatrixXf::Zero(n_state,n_state*NUM_DRONES);
+    S = Eigen::MatrixXf::Zero(n_meas,n_meas*NUM_DRONES);
 
-    F = Eigen::MatrixXf::Zero(4,4);
-    Q = Eigen::MatrixXf::Zero(4,4);
-    R = Eigen::MatrixXf::Zero(4,4);
-    K = Eigen::MatrixXf::Zero(4,4*NUM_DRONES);
+    F = Eigen::MatrixXf::Zero(n_state,n_state);
+    A = Eigen::MatrixXf::Zero(n_state,n_state);
+    H = Eigen::MatrixXf::Zero(n_meas,n_state);
+    Q = Eigen::MatrixXf::Zero(n_state,n_state);
+    R = Eigen::MatrixXf::Zero(n_meas, n_meas);
+    K = Eigen::MatrixXf::Zero(n_state,n_meas*NUM_DRONES);
 
-    X_k = Eigen::MatrixXf::Zero(4,NUM_DRONES);
-    X_k_previous = Eigen::MatrixXf::Zero(4,NUM_DRONES);
+    X_k = Eigen::MatrixXf::Zero(n_state,NUM_DRONES);
+    X_k_previous = Eigen::MatrixXf::Zero(n_state,NUM_DRONES);
 
-    B = Eigen::MatrixXf::Zero(4,3*NUM_DRONES);
+    B = Eigen::MatrixXf::Zero(n_state,n_input*NUM_DRONES);
 
-    mk_k_minus_1_beforePrediction = Eigen::MatrixXf::Zero(4,NUM_DRONES);
+    mk_k_minus_1_beforePrediction = Eigen::MatrixXf::Zero(n_state,NUM_DRONES);
+    Detections = Eigen::MatrixXf::Zero(4,NUM_DRONES);
+
 
     cu = cam_cu;
     cv = cam_cv;
     f = cam_f;
-    dt = meas_dt;
+    dt = 0.01;
 }
 
 void PhdFilter::set_num_drones(int num_drones_in)
@@ -99,305 +92,205 @@ void PhdFilter::set_num_drones(int num_drones_in)
 void PhdFilter::initialize()
 {
     Eigen::MatrixXf P_k_init;
-    P_k_init = Eigen::MatrixXf(4,4);
+    P_k_init = Eigen::MatrixXf(n_state,n_state);
     P_k_init <<
-                10,0,0,0,
+            10,0,0,0,
             0,10,0,0,
             0,0,5,0,
             0,0,0,5;
 
 
     for(int i = 0; i < Z_k.cols(); i ++)
-    {
-
+    {   
         //store Z into mk (x,y)
-        mk_minus_1(0,i) = Z_k(0,i);
-        mk_minus_1(1,i) = Z_k(1,i);
-        mk_minus_1(2,i) = 0;
-        mk_minus_1(3,i) = 0;
-
-
+        ROS_DEBUG_STREAM("ZK: \n" << Z_k << endl); 
+        // mk_minus_1.block(0, i, n_state, 1) = H.transpose()*Z_k.block(0,i, n_meas,1);
+        mk_minus_1.block(0, i, n_state, 1) << Z_k.block(0, i, 1, 1), 0, Z_k.block(1, i, 1, 1), 0; 
+        ROS_DEBUG_STREAM("mk_minus_1: \n" << mk_minus_1 << endl);         
         //store pre-determined weight into wk (from matlab)
         wk_minus_1(i) = .0016;
-
         //store pre-determined weight into Pk (from paper)
-        Pk_minus_1.block<4,4>(0,i*4) = P_k_init;
+        Pk_minus_1.block(0,i*4, n_state,n_state) = P_k_init;
     }
 
-    F << 1,0,dt_cam,0,
-            0,1,0,dt_cam,
-            0,0,1,0,
+    A << 1,dt_imu,0,0,
+            0,1,0,0,
+            0,0,1,dt_imu,
             0,0,0,1;
+    
+    //Measurement Matrix
+    H << 1, 0, 0 , 0,
+         0, 0, 1, 0;
 
-    //Q = sigma_v^2 * [ [1/4*dt^4*I2, 1/2*dt^3*I2]; [1/2*dt^3* I2, dt^2*I2] ]; %Process noise covariance, given in Vo&Ma.
+    //Process noise covariance, given in Vo&Ma.
+    Q << 6.25,      0,      0,          0,
+         0,         12.5,   0,          0,
+         0,         0,      6.25,       0,
+         0,         0,      0,          12.5;
+    Q = Q*0.5;
 
-    Q << 6.25, 0, 12.5, 0,
-            0, 6.25, 0, 12.5,
-            12.5, 0, 25, 0,
-            0, 12.5, 0, 25;
-
-    R << 100,0,0,0,
-            0,100,0,0,
-            0,0,100,0,
-            0,0,0,100;
+    //Measurement Noise
+    R << 45,   0,
+         0,     45;
 
     numTargets_Jk_minus_1 = NUM_DRONES;
 }
 
-/* additional motion prediction on ang vel CB
- * updates m,w,P,x with given dt
+/* 
+ * Prediction step is done async. The prediction is called whenever we get an IMU message.
+ * The update step is called once we get a measurement from the network
 */
 void PhdFilter::asynchronous_predict_existing()
 {
-    // Disable async - Feature recomended by rundong
-    if(!enable_async)
-    {
-        return;
-    }
+    ROS_DEBUG("======= 0. asynch predict ======= \n");
+    //update A
+    update_A_matrix(dt_imu);
 
-    //update dt
-    
-    //update F
-    update_F_matrix(dt_imu);
-
-    ROS_INFO("======= 0. asynch predict ======= \n");
     wk_minus_1 = prob_survival * wk_minus_1;
-    Eigen::MatrixXf ang_vel_temp;
-    ang_vel_temp = Eigen::MatrixXf::Zero(4,3);
-
-    //  cout << "B: " << B << endl;
-    //  cout << "u: " << ang_vel_k << endl;
-
-    ROS_INFO("size mk-1: %lu, size B: %lu",mk_minus_1.cols(), B.cols());
-
-    for (int i = 0; i < mk_minus_1.cols(); i++)
-    {
-        //cout << "i: " << i << endl;
-
-        ang_vel_temp= B.block<4,3>(0,3*i) * ang_vel_k;
-        //      cout << "Bu: " << endl << ang_vel_temp << endl;
-        // Ax + Bu
-        mk_minus_1.block<4,1>(0,i) = F * mk_minus_1.block<4,1>(0,i) + ang_vel_temp;
-    }
-
-//    % F =
-//    %
-//    % [(omegay*(2*cu - 2*pu))/f - (omegax*(cv - pv))/f + 1, dt,                       omegaz - (omegax*(cu - pu))/f,  0]
-//    % [                                                  0,  1,                                                   0,  0]
-//    % [                      (omegay*(cv - pv))/f - omegaz,  0, (omegay*(cu - pu))/f - (omegax*(2*cv - 2*pv))/f + 1, dt]
-//    % [                                                  0,  0,                                                   0,  1]
-//    %
-
+    Eigen::MatrixXf Bu_temp = Eigen::MatrixXf::Zero(n_state,n_meas);
     Eigen::MatrixXf F_modified;
-    F_modified = Eigen::MatrixXf(4,4);
+    F_modified = Eigen::MatrixXf(n_state,n_state);
 
-    // cu = 329; //from flightmare simulation
-    // cv = 243;
-    // f = 431;
     float omega_x = ang_vel_k(0);
     float omega_y = ang_vel_k(1);
     float omega_z = ang_vel_k(2);
-    // float dt = 0.225;
     float pu = 0;
     float pv = 0;
 
-
-
     Eigen::MatrixXf P_temp;
-    P_temp = Eigen::MatrixXf(4,4);
+    P_temp = Eigen::MatrixXf(n_state,n_state);
 
-    for(int j = 0; j < mk_minus_1.cols(); j ++)
+    ROS_DEBUG("size mk-1: %lu, size B: %lu",mk_minus_1.cols(), B.cols());
+    ROS_DEBUG_STREAM("A:\n" << A << endl);
+    for (int i = 0; i < mk_minus_1.cols(); i++)
     {
-        P_temp = Pk_minus_1.block<4,4>(0,4*j);
+        ROS_DEBUG("iteration: %d", i);
+        ROS_DEBUG_STREAM("B:\n" << B.block(0,n_input*i, n_state,n_input)); 
+        Bu_temp = B.block(0,n_input*i, n_state,n_input) * ang_vel_k; //
+        ROS_DEBUG_STREAM("Bu:\n" << Bu_temp); 
+        mk_minus_1.block(0,i, n_state,1) = A * mk_minus_1.block(0,i, n_state,1) + Bu_temp;
+        P_temp = Pk_minus_1.block(0,n_state*i, n_state,n_state);
+        pu = X_k(0,i);
+        pv = X_k(2,i);
 
-        pu = X_k(0,j);
-        pv = X_k(1,j);
-
-        F_modified(0,0) = (omega_y*(2*cu - 2*pu))/f - (omega_x*(cv - pv))/f + 1;    F_modified(0,1) = dt;   F_modified(0,2) = omega_z - (omega_x*(cu - pu))/f;    F_modified(0,3) = 0;
-        F_modified(1,0) = 0;                                                        F_modified(1,1) = 1;    F_modified(1,2) = 0;                                  F_modified(1,3) = 0;
-        F_modified(2,0) = (omega_y*(cv - pv))/f - omega_z;                          F_modified(2,1) = 0;    F_modified(2,2) = (omega_y*(cu - pu))/f - (omega_x*(2*cv - 2*pv))/f + 1;    F_modified(2,3) = dt;
-        F_modified(3,0) = 0;                                                        F_modified(3,1) = 0;    F_modified(3,2) = 0;                                  F_modified(3,3) = 1;
-
+        F_modified(0,0) = (dt_imu*omega_y*(2*cu - 2*pu))/f - (dt_imu*omega_x*(cv - pv))/f + 1;      F_modified(0,1) = dt;   F_modified(0,2) = dt_imu*omega_z - (dt_imu*omega_x*(cu - pu))/f;                            F_modified(0,3) = 0;
+        F_modified(1,0) = 0;                                                                        F_modified(1,1) = 1;    F_modified(1,2) = 0;                                                                        F_modified(1,3) = 0;
+        F_modified(2,0) = (dt_imu*omega_y*(cv - pv))/f - dt_imu*omega_z;                            F_modified(2,1) = 0;    F_modified(2,2) = (dt_imu*omega_y*(cu - pu))/f - (dt_imu*omega_x*(2*cv - 2*pv))/f + 1;      F_modified(2,3) = dt;
+        F_modified(3,0) = 0;                                                                        F_modified(3,1) = 0;    F_modified(3,2) = 0;                                                                        F_modified(3,3) = 1;
 
         P_temp = Q + F_modified* P_temp * F_modified.transpose();
-        Pk_minus_1.block<4,4>(0,4*j) = P_temp;
+        Pk_minus_1.block(0,n_state*i, n_state,n_state) = P_temp;
     }
 
     X_k = mk_minus_1;
-//    cout << "***Asynch X_k: " << endl << X_k << endl;
-    ROS_ERROR("NEW ASYNCH");
-
-}
-
-void PhdFilter::phd_predict_existing()
-{
-    ROS_INFO("======= 1. predict ======= \n");
-
-    mk_k_minus_1_beforePrediction = mk_minus_1;
-
-    wk_minus_1 = prob_survival * wk_minus_1;
-
-    //  cout << "B: " << B << endl;
-    //  cout << "u: " << ang_vel_k << endl;
-
-    Eigen::MatrixXf ang_vel_temp;
-    ang_vel_temp = Eigen::MatrixXf::Zero(4,3);
-
-    cout << "mk-1: " << endl << setprecision(3) << mk_minus_1 << endl;
-
-
-    for (int i = 0; i < mk_minus_1.cols(); i++)
-    {
-
-        ang_vel_temp= B.block<4,3>(0,3*i) * ang_vel_k ;
-        // Ax + Bu
-        mk_minus_1.block<4,1>(0,i) = F * mk_minus_1.block<4,1>(0,i) + ang_vel_temp;
-    }
-
-
-
-    Eigen::MatrixXf P_temp;
-    P_temp = Eigen::MatrixXf(4,4);
-
-    for(int j = 0; j < mk_minus_1.cols(); j ++)
-    {
-        P_temp = Pk_minus_1.block<4,4>(0,4*j);
-        P_temp = Q + F* P_temp * F.transpose();
-        Pk_minus_1.block<4,4>(0,4*j) = P_temp; 
-    }
-
-    //     cout << "P: " << endl << Pk_minus_1 << endl;
-    //     cout << "mk-1: " << endl << setprecision(3) << mk_minus_1 << endl;
-    //     cout << "wk-1: " << endl << setprecision(3) << wk_minus_1 << endl;
-
-
     wk_k_minus_1 = wk_minus_1;
     mk_k_minus_1 = mk_minus_1;
     Pk_k_minus_1 = Pk_minus_1;
     numTargets_Jk_k_minus_1 = numTargets_Jk_minus_1;
-    //  ROS_INFO("size track: %d", numTargets_Jk_k_minus_1);
 
-    flag_asynch_start = true;
+    ROS_DEBUG_STREAM("WK|K-1:\n" << wk_k_minus_1 << endl);
+    ROS_DEBUG_STREAM("mK|K-1:\n" << mk_k_minus_1 << endl);
+    ROS_DEBUG_STREAM("PK|K-1:\n" << Pk_k_minus_1 << endl);
 }
+
 
 void PhdFilter::phd_construct()
 {
+    ROS_DEBUG("======= 2. construct ======= \n");
     wk_k_minus_1 = wk_minus_1;
     mk_k_minus_1 = mk_minus_1;
     Pk_k_minus_1 = Pk_minus_1;
     numTargets_Jk_k_minus_1 = numTargets_Jk_minus_1;
 
-    ROS_INFO("======= 2. construct ======= \n");
-    Eigen::MatrixXf PHt, S_j, SChol, SCholInv, identity, w1;
-    PHt = Eigen::MatrixXf(4,4);
-    S_j = Eigen::MatrixXf(4,4);
-    SChol = Eigen::MatrixXf(4,4);
-    SCholInv = Eigen::MatrixXf(4,4);
-    identity = Eigen::MatrixXf::Identity(4,4);
-    w1 = Eigen::MatrixXf(4,4);
+    Eigen::MatrixXf PHt, HPHt, identity4;
+    PHt = Eigen::MatrixXf(n_state,n_meas);
+    HPHt = Eigen::MatrixXf(n_meas,n_meas);
+
+    identity4 = Eigen::MatrixXf::Identity(4,4);
 
     for(int j = 0; j < numTargets_Jk_k_minus_1; j ++)
     {
-
-        PHt = Pk_k_minus_1.block<4,4>(0,4*j);
-        S_j = R + PHt;
-        SChol = S_j.llt().matrixU();
-        SCholInv = identity*SChol.inverse();
-        w1 = PHt * SCholInv;
-        K.block<4,4>(0,4*j) = w1 * SCholInv.transpose();
-        S.block<4,4>(0,4*j) = S_j;
-
-        //    cout << "SChol: " << endl << SChol << endl;
-        //    cout << "SCholInv: " << endl << SCholInv << endl;
-
-        P_k_k.block<4,4>(0,4*j) = Pk_k_minus_1.block<4,4>(0,4*j) - w1*w1.transpose();
-
+        PHt = Pk_k_minus_1.block(0,n_state*j, n_state,n_state) * H.transpose();
+        HPHt = H*PHt;
+        K.block(0,n_meas*j, n_state,n_meas) = PHt * (HPHt + R).inverse();
+        S.block(0,n_meas*j, n_meas,n_meas) = HPHt + R;
+        Eigen::MatrixXf t1 = (identity4 - K.block(0,n_meas*j, n_state,n_meas)*H)*Pk_k_minus_1.block(0,n_state*j, n_state,n_state);
+        P_k_k.block(0,n_state*j, n_state,n_state) = t1;
     }
-
-    //    cout << "P_k_k: " << endl << P_k_k << endl;
-    //    cout << "K: " << endl << K << endl;
-
-
+    ROS_DEBUG_STREAM("P_k_k: " << endl << P_k_k << endl);
+    ROS_DEBUG_STREAM("K: " << endl << K << endl);
 }
 
 void PhdFilter::phd_update()
 {
-    ROS_INFO("======= 3. update ======= \n");
+    ROS_DEBUG("======= 3. update ======= \n");
 
     //1. set up matrix size
     wk = Eigen::MatrixXf::Zero(1,numTargets_Jk_k_minus_1 * detected_size_k + numTargets_Jk_k_minus_1);
-    mk = Eigen::MatrixXf::Zero(4,numTargets_Jk_k_minus_1 * detected_size_k + numTargets_Jk_k_minus_1);
-    Pk = Eigen::MatrixXf::Zero(4, 4 * (numTargets_Jk_k_minus_1 * detected_size_k + numTargets_Jk_k_minus_1));
+    mk = Eigen::MatrixXf::Zero(n_state,numTargets_Jk_k_minus_1 * detected_size_k + numTargets_Jk_k_minus_1);
+    Pk = Eigen::MatrixXf::Zero(n_state, n_state * (numTargets_Jk_k_minus_1 * detected_size_k + numTargets_Jk_k_minus_1));
 
 
-    Eigen::MatrixXf thisZ, thisVel, meanDelta_pdf, meanDelta, cov_pdf;
+    Eigen::MatrixXf thisZ, meanDelta_pdf, meanDelta, cov_pdf;
     Eigen::MatrixXf w_new, w_new_exponent;
-    thisZ = Eigen::MatrixXf(4,1);
-    thisVel = Eigen::MatrixXf(2,1);
-    meanDelta_pdf = Eigen::MatrixXf(2,1);
-    meanDelta = Eigen::MatrixXf(2,1);
-    cov_pdf = Eigen::MatrixXf(4,4);
+    
+
+    thisZ = Eigen::MatrixXf(n_meas,1);
+    meanDelta_pdf = Eigen::MatrixXf(n_meas,1);
+    meanDelta = Eigen::MatrixXf(n_meas,1);
+    cov_pdf = Eigen::MatrixXf(n_meas,n_meas);
     w_new = Eigen::MatrixXf(1,1);
     w_new_exponent = Eigen::MatrixXf(1,1);
 
     int index = 0;
     L = 0;
 
-    //  cout << "numTargets_Jk_k_minus_1: "  << numTargets_Jk_k_minus_1 << endl;
-
-    //2. update first columns of m_k which corresponds to no new detections
     for (int i = 0; i < numTargets_Jk_k_minus_1; i++ )
     {
         wk(i) = (1-prob_detection) * wk_k_minus_1(i);
-        mk.block<4,1>(0,i)  = mk_k_minus_1.block<4,1>(0,i);
-        Pk.block<4,4>(0,4*i) = Pk_k_minus_1.block<4,4>(0,4*i);
-
+        mk.block(0,i, n_state,1)  = mk_k_minus_1.block(0,i, n_state,1);
+        Pk.block(0,n_state*i, n_state,n_state) = Pk_k_minus_1.block(0,n_state*i, n_state,n_state);
     }
 
-//      cout << "# of Z: "  << detected_size_k << ", # of Jk: "<< numTargets_Jk_k_minus_1 <<  endl;
-
-
-
-    //3. update all combinations for measurements and targets
     for (int z = 0; z < detected_size_k; z++)
     {
         L = L+1;
 
         for (int j = 0; j < numTargets_Jk_k_minus_1; j++)
         {
-//            ROS_INFO("j: %d",j);
-
-            thisZ.block<2,1>(0,0) = Z_k.block<2,1>(0,z);
+            thisZ.block(0,0, n_meas,1) = Z_k.block(0,z, n_meas,1);
 
             index = (L) * numTargets_Jk_k_minus_1 + j; //3~11
-
+            ROS_DEBUG("Index: %d, L: %d\n", index, L);
             //update weight (multivar prob distr)
-            meanDelta_pdf = thisZ.block<2,1>(0,0) - mk_k_minus_1.block<2,1>(0,j);
+            meanDelta_pdf = thisZ - H*mk_k_minus_1.block(0,j, n_state,1);
+            ROS_DEBUG_STREAM("Mean Delta PDF: " << meanDelta_pdf << endl);
 
-
-
-            cov_pdf = S.block<2,2>(0,4*j);
-            w_new_exponent = -0.5 * meanDelta_pdf.transpose() * cov_pdf.inverse() * meanDelta_pdf ;
+            cov_pdf = S.block(0,n_meas*j, n_meas,n_meas);
+            ROS_DEBUG_STREAM("Cov PDF: " << cov_pdf << endl);
+            w_new_exponent = -0.5 * (meanDelta_pdf.transpose() * cov_pdf.inverse() * meanDelta_pdf) * (meanDelta_pdf.transpose() * cov_pdf.inverse() * meanDelta_pdf) ;
+            ROS_DEBUG_STREAM("W_new_exponent: " << w_new_exponent << endl);
 
             double w_val = wk_k_minus_1(j) * pow(2*PI, -1/2) * pow(cov_pdf.determinant(),-0.5) * exp(w_new_exponent(0,0));
+            ROS_DEBUG_STREAM("w_val: " << w_val << endl);
             wk(index)= w_val;
 
-
-
             //update mean
-            mk.block<4,1>(0,index) = mk_k_minus_1.block<4,1>(0,j);
-            meanDelta = thisZ.block<2,1>(0,0) - mk_k_minus_1.block<2,1>(0,j);
-            mk.block<2,1>(0,index) =  mk_k_minus_1.block<2,1>(0,j) + K.block<2,2>(0,4*j)*meanDelta;
+            mk.block(0,index, n_state,1) = mk_k_minus_1.block(0,j, n_state,1);
+            meanDelta = thisZ.block(0,0, n_meas,1) - H*mk_k_minus_1.block(0,j, n_state,1);
+            mk.block(0,index, n_state, 1) =  mk_k_minus_1.block(0,j, n_state,1) + K.block(0,n_meas*j, n_state,n_meas)*meanDelta;
             //update cov
-            Pk.block<4,4>(0,4*index) = P_k_k.block<4,4>(0,4*j);
+            Pk.block(0,n_state*index, n_state,n_state) = P_k_k.block(0,n_state*j, n_state,n_state);
 
 //            ROS_INFO("wk: %f",wk(index));
-//            cout << "mk: "<< mk <<  endl;
+//            ROS_DEBUG_STREAM << "mk: "<< mk <<  endl;
 
         }
 
 
-        //cout << "mk: " << endl << mk << endl;
+        ROS_DEBUG_STREAM("mk(pre): " << endl << mk << endl);
+        ROS_DEBUG_STREAM("pk(pre): " << endl << Pk << endl);
+        ROS_DEBUG_STREAM("wk(pre): " << endl << wk << endl);
 
         //normalize weights
         float weight_tally = 0;
@@ -419,24 +312,21 @@ void PhdFilter::phd_update()
             old_weight = wk(index);
 //            float measZx = Z_k(0,i);
 //            float measZy = Z_k(1,i);
-            wk(index) = old_weight / ( clutter_intensity(X_k(0,i),X_k(1,i))+ weight_tally);
+            wk(index) = old_weight / ( clutter_intensity(X_k(0,i),X_k(2,i))+ weight_tally);
 //            wk(index) = old_weight / ( weight_tally);
-
-
         }
-
 
     }
 
-    cout << "wk: " << endl << setprecision(3) << wk << endl;
-    cout << "mk: " << endl << setprecision(3) << mk << endl;
-    //  cout << "Pk: " << endl << setprecision(3) << Pk << endl;
+    ROS_DEBUG_STREAM("wk(post): " << endl << setprecision(3) << wk << endl);
+    ROS_DEBUG_STREAM("mk(post): " << endl << setprecision(3) << mk << endl);
+    ROS_DEBUG_STREAM("Pk(post): " << endl << setprecision(3) << Pk << endl);
 
 }
 
 void PhdFilter::phd_prune()
 {
-    ROS_INFO("======= 4. prune ======= \n");
+    ROS_DEBUG("======= 4. prune ======= \n");
 
     //get location of maximum
     Eigen::MatrixXd::Index maxRow, maxCol;
@@ -451,20 +341,19 @@ void PhdFilter::phd_prune()
     int update_counter = 0;
 
     Eigen::MatrixXf P_bar_sum, P_val;
-    P_val = Eigen::MatrixXf(4,4);
-    P_bar_sum = Eigen::MatrixXf::Zero(4,4);
+    P_val = Eigen::MatrixXf(n_state, n_state);
+    P_bar_sum = Eigen::MatrixXf::Zero(n_state, n_state);
 
 
     //store for missed detection value
     for(int i = 0; i < NUM_DRONES; i++)
     {
         wk_bar(i) = wk_bar_fixed(i);
-        mk_bar.block<4,1>(0,i) = mk_bar_fixed.block<4,1>(0,i);
-        Pk_bar.block<4,4>(0,4*i) = Pk_bar_fixed.block<4,4>(0,4*i);
+        mk_bar.block(0,i, n_state,1) = mk_bar_fixed.block(0,i, n_state,1);
+        Pk_bar.block(0,n_state*i, n_state,n_state) = Pk_bar_fixed.block(0,n_state*i, n_state,n_state);
     }
 
 
-    //  cout << "wk: "  << wk << endl;
     //find weights threshold
     for(int i = 0; i < wk.cols(); i ++)
     {
@@ -478,13 +367,13 @@ void PhdFilter::phd_prune()
         }
     }
 
-    std::cout << "index_weight is of size " << I.rows() << "x" << I.cols() << ",  I: "  << I << endl;
+    ROS_DEBUG_STREAM("index_weight is of size " << I.rows() << "x" << I.cols() << ",  I: "  << I << endl);
 
 
     for (int i = 0; i < NUM_DRONES; i++)
     {
 
-        ROS_INFO("I length: %lu",I.cols());
+        ROS_DEBUG("I length: %lu",I.cols());
         if(I.cols() == 0)
         {
             break;
@@ -495,7 +384,7 @@ void PhdFilter::phd_prune()
 
         float max = I_weights.maxCoeff(&maxRow, &maxCol);
         j = int(I(maxCol));
-        //    cout << "Max w: " << max <<  ", at I_index: " << maxCol << ", w_index: " << j << endl;
+        //    ROS_DEBUG_STREAM("Max w: " << max <<  ", at I_index: " << maxCol << ", w_index: " << j << endl;
 
         //store index
         indexOrder(i) = j;
@@ -507,24 +396,24 @@ void PhdFilter::phd_prune()
 
         int target_index = int(j%NUM_DRONES);
         wk_bar(target_index) = wk(j);
-        mk_bar.block<4,1>(0,target_index) = mk.block<4,1>(0,j);
-        Pk_bar.block<4,4>(0,4*target_index) = Pk.block<4,4>(0,4*j);
+        mk_bar.block(0,target_index, n_state,1) = mk.block(0,j, n_state,1);
+        Pk_bar.block(0,n_state*target_index, n_state,n_state) = Pk.block(0,n_state*j, n_state,n_state);
 
 
         //remove index that is same index multiple
         search_index = j%numTargets_Jk_k_minus_1;
-        //    cout << "search index:" << search_index <<  endl;
+        //    ROS_DEBUG_STREAM("search index:" << search_index <<  endl;
         for (int i =0; i < I.cols(); i++)
         {
-            //        cout << "I(i): " << int(I(i)) << " ...I(i)%3: " << int(I(i))%numTargets_Jk_k_minus_1 << endl;
+            //        ROS_DEBUG_STREAM("I(i): " << int(I(i)) << " ...I(i)%3: " << int(I(i))%numTargets_Jk_k_minus_1 << endl;
             if( int(I(i))%numTargets_Jk_k_minus_1 == search_index )
             {
 
                 //remove this index from I, Iweight
-                        cout << "removing index:" << i << endl;
+                        ROS_DEBUG_STREAM("removing index:" << i << endl);
                 removeColumn(I,i);
                 removeColumnf(I_weights,i);
-                        cout << "remaining I:" << I << endl;
+                        ROS_DEBUG_STREAM("remaining I:" << I << endl);
 
                 //to prevent skipping when [4 7 8 10 11] search index = 1... 4,7 causes to skip
                 i--;
@@ -532,15 +421,15 @@ void PhdFilter::phd_prune()
             }
         }
 
-        ROS_INFO("I length: %lu",I.cols());
+        ROS_DEBUG("I length: %lu",I.cols());
         if(I.cols() == 0)
         {
             break;
         }
 
-        //    cout << "I: "  << I << endl;
+        //    ROS_DEBUG_STREAM("I: "  << I << endl;
     }
-    cout << "indexOrder: "  << indexOrder << endl;
+    ROS_DEBUG_STREAM("indexOrder: "  << indexOrder << endl);
 
     //=============== rearrange index ===============
     if (indexOrder.cols() > 0)
@@ -567,14 +456,14 @@ void PhdFilter::phd_prune()
             }
         }
 
-        cout << "newIndex: "  << newIndex << endl;
+        ROS_DEBUG_STREAM("newIndex: "  << newIndex << endl);
 
         int sortedIndex = 0;
 
-//        cout << "wk_bar: "  << wk_bar << endl;
-//        cout << "mk_bar: "  << endl << mk_bar << endl;
-//        cout << "wk_bar_fixed: "  << wk_bar_fixed << endl;
-//        cout << "mk_bar_fixed: "  << endl << mk_bar_fixed << endl;
+//        ROS_DEBUG_STREAM("wk_bar: "  << wk_bar << endl;
+//        ROS_DEBUG_STREAM("mk_bar: "  << endl << mk_bar << endl;
+//        ROS_DEBUG_STREAM("wk_bar_fixed: "  << wk_bar_fixed << endl;
+//        ROS_DEBUG_STREAM("mk_bar_fixed: "  << endl << mk_bar_fixed << endl;
 
         //sort highest weight to correct association
         for(int i = 0; i <NUM_DRONES; i++  )
@@ -585,18 +474,18 @@ void PhdFilter::phd_prune()
 //            Pk_bar_fixed.block<4,4>(0,4*sortedIndex) = Pk_bar.block<4,4>(0,4*i);
 
             wk_bar_fixed(i) = wk_bar(i);
-            mk_bar_fixed.block<4,1>(0,i) = mk_bar.block<4,1>(0,i);
-            Pk_bar_fixed.block<4,4>(0,4*i) = Pk_bar.block<4,4>(0,4*i);
+            mk_bar_fixed.block(0,i, n_state,1) = mk_bar.block(0,i, n_state,1);
+            Pk_bar_fixed.block(0,n_state*i, n_state,n_state) = Pk_bar.block(0,n_state*i, n_state,n_state);
         }
 
-        ROS_INFO("updated");
+        ROS_DEBUG("updated");
     }
 
 
 
     numTargets_Jk_minus_1 = wk_bar_fixed.cols();
-    //  cout << "Pk_bar_fixed: " << endl << setprecision(3) << Pk_bar_fixed << endl;
-    ROS_INFO("end prune");
+    //  ROS_DEBUG_STREAM("Pk_bar_fixed: " << endl << setprecision(3) << Pk_bar_fixed << endl;
+    ROS_DEBUG("end prune");
 
 
 }
@@ -605,7 +494,7 @@ void PhdFilter::phd_prune()
 void PhdFilter::phd_state_extract()
 {
 
-    ROS_INFO("============ 5. extract ============= ");
+    ROS_DEBUG("============ 5. extract ============= ");
     Eigen::MatrixXf velocity, position;
     velocity = Eigen::MatrixXf(2,1);
     position = Eigen::MatrixXf(2,1);
@@ -617,27 +506,25 @@ void PhdFilter::phd_state_extract()
     mk_minus_1 = mk_bar_fixed;
     Pk_minus_1 = Pk_bar_fixed.cwiseAbs();
 
+    
+    ROS_DEBUG_STREAM("--- X_k: " << endl << X_k << endl);
     X_k = mk_minus_1;
-    cout << "--- X_k: " << endl << X_k << endl;
-
     if (k_iteration > 3)
     {
         for (int i = 0; i < wk_bar_fixed.cols(); i++)
         {
-//            position = (mk_minus_1.block<2,1>(0,i) - mk_k_minus_1_beforePrediction.block<2,1>(0,i)); //TO DO modify beforePrediction
-
-//            position = (Z_k.block<2,1>(0,i) - Z_k_previous.block<2,1>(0,i));
-            position = (X_k.block<2,1>(0,i) - X_k_previous.block<2,1>(0,i));
-
+            position.block<1, 1>(0, 0) = (X_k.block<1,1>(0,i) - X_k_previous.block<1,1>(0,i));
+            position.block<1, 1>(1, 0) = (X_k.block<1,1>(2,i) - X_k_previous.block<1,1>(2,i));
             velocity = position/ (dt_cam*gain_fine_tuned) ;
-            mk_minus_1.block<2,1>(2,i) = velocity;
-            //          cout << "--- position: " << endl << position << endl;
-            //          cout << "--- dt: " << endl << dt << endl;
-            //          cout << "--- velocity: " << endl << velocity << endl;
+            mk_minus_1.block<1,1>(1,i) = velocity.block<1,1>(0,0);
+            mk_minus_1.block<1,1>(3,i) = velocity.block<1,1>(1,0);
+            ROS_DEBUG_STREAM("--- position: " << endl << position << endl);
+            ROS_DEBUG_STREAM("--- dt: " << endl << dt << endl);
+            ROS_DEBUG_STREAM("--- velocity: " << endl << velocity << endl);
         }
 
     }
-
+    X_k = mk_minus_1;
     X_k_previous = X_k;
 }
 
@@ -691,10 +578,16 @@ void PhdFilter::removeColumnf(Eigen::MatrixXf& matrix, unsigned int colToRemove)
     matrix.conservativeResize(numRows,numCols);
 }
 
+void PhdFilter::update_A_matrix(float input_dt)
+{
+    A << 1,input_dt,0,0,
+            0,1,0,0,
+            0,0,1,input_dt,
+            0,0,0,1;
+}
+
 void PhdFilter::update_F_matrix(float input_dt)
 {
-    F << 1,0,input_dt,0,
-            0,1,0,input_dt,
-            0,0,1,0,
-            0,0,0,1;
+    ROS_DEBUG_STREAM("This should not happen !\n");
+    return;
 }

@@ -31,6 +31,7 @@ class PhdFilter
   PhdFilter();
 
   void initialize_matrix(float cam_cu, float cam_cv, float cam_f, float meas_dt=0.225);
+  void initialize_matrix();
   void phd_track();
   void phd_predict_existing();
   void phd_construct();
@@ -46,6 +47,7 @@ class PhdFilter
   float clutter_intensity(const float X, const float Y);
   Eigen::MatrixXf left_divide(const Eigen::MatrixXf);
   void update_F_matrix(float input_dt);
+  void update_A_matrix(float input_dt);
 
 
   ros::Time startTime,endTime,processTime;
@@ -68,6 +70,8 @@ class PhdFilter
 
   //kalman filter variables
   Eigen::MatrixXf F;
+  Eigen::MatrixXf A;
+  Eigen::MatrixXf H;
   Eigen::MatrixXf Q;
   Eigen::MatrixXf R;
   Eigen::MatrixXf K;
@@ -112,11 +116,17 @@ class PhdFilter
 
   Eigen::MatrixXf B;
 
+  Eigen::MatrixXf Detections;
+
   cv::Mat input_image;
   sensor_msgs::ImagePtr image_msg;
 
   float cu, cv, f;
   float dt;
+
+  const uint8_t n_state = 4;
+  const uint8_t n_meas = 2;
+  const uint8_t n_input = 3;
 
  private:
 
