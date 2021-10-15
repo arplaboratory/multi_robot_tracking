@@ -385,16 +385,11 @@ void multi_robot_tracking_Nodelet::imu_Callback(const sensor_msgs::ImuConstPtr &
         //asynchronous motion prediction
         if(first_track_flag)
         {
-//            ROS_INFO("imu cb asych function start");
             phd_filter_.asynchronous_predict_existing();
             publish_tracks();
         }
-
     }
     imu_timestamp = imu_msg->header.stamp;
-
-//    ROS_INFO("end of imu cb");
-
 }
 
 Eigen::MatrixXf multi_robot_tracking_Nodelet::get_B_ang_vel_matrix(float x, float y)

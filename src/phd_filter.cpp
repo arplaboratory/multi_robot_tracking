@@ -148,8 +148,7 @@ void PhdFilter::asynchronous_predict_existing()
 
     wk_minus_1 = prob_survival * wk_minus_1;
     Eigen::MatrixXf Bu_temp = Eigen::MatrixXf::Zero(n_state,n_meas);
-    Eigen::MatrixXf F_modified;
-    F_modified = Eigen::MatrixXf(n_state,n_state);
+    F = Eigen::MatrixXf(n_state,n_state);
 
     float omega_x = ang_vel_k(0);
     float omega_y = ang_vel_k(1);
@@ -173,12 +172,12 @@ void PhdFilter::asynchronous_predict_existing()
         pu = X_k(0,i);
         pv = X_k(2,i);
 
-        F_modified(0,0) = (dt_imu*omega_y*(2*cu - 2*pu))/f - (dt_imu*omega_x*(cv - pv))/f + 1;      F_modified(0,1) = dt;   F_modified(0,2) = dt_imu*omega_z - (dt_imu*omega_x*(cu - pu))/f;                            F_modified(0,3) = 0;
-        F_modified(1,0) = 0;                                                                        F_modified(1,1) = 1;    F_modified(1,2) = 0;                                                                        F_modified(1,3) = 0;
-        F_modified(2,0) = (dt_imu*omega_y*(cv - pv))/f - dt_imu*omega_z;                            F_modified(2,1) = 0;    F_modified(2,2) = (dt_imu*omega_y*(cu - pu))/f - (dt_imu*omega_x*(2*cv - 2*pv))/f + 1;      F_modified(2,3) = dt;
-        F_modified(3,0) = 0;                                                                        F_modified(3,1) = 0;    F_modified(3,2) = 0;                                                                        F_modified(3,3) = 1;
+        F(0,0) = (dt_imu*omega_y*(2*cu - 2*pu))/f - (dt_imu*omega_x*(cv - pv))/f + 1;      F(0,1) = dt;   F(0,2) = dt_imu*omega_z - (dt_imu*omega_x*(cu - pu))/f;                            F(0,3) = 0;
+        F(1,0) = 0;                                                                        F(1,1) = 1;    F(1,2) = 0;                                                                        F(1,3) = 0;
+        F(2,0) = (dt_imu*omega_y*(cv - pv))/f - dt_imu*omega_z;                            F(2,1) = 0;    F(2,2) = (dt_imu*omega_y*(cu - pu))/f - (dt_imu*omega_x*(2*cv - 2*pv))/f + 1;      F(2,3) = dt;
+        F(3,0) = 0;                                                                        F(3,1) = 0;    F(3,2) = 0;                                                                        F(3,3) = 1;
 
-        P_temp = Q + F_modified* P_temp * F_modified.transpose();
+        P_temp = Q + F* P_temp * F.transpose();
         Pk_minus_1.block(0,n_state*i, n_state,n_state) = P_temp;
     }
 
@@ -231,13 +230,12 @@ void PhdFilter::phd_update()
     Pk = Eigen::MatrixXf::Zero(n_state, n_state * (numTargets_Jk_k_minus_1 * detected_size_k + numTargets_Jk_k_minus_1));
 
 
-    Eigen::MatrixXf thisZ, meanDelta_pdf, meanDelta, cov_pdf;
+    Eigen::MatrixXf thisZ, meanDelta_pdf, cov_pdf;
     Eigen::MatrixXf w_new, w_new_exponent;
     
 
     thisZ = Eigen::MatrixXf(n_meas,1);
     meanDelta_pdf = Eigen::MatrixXf(n_meas,1);
-    meanDelta = Eigen::MatrixXf(n_meas,1);
     cov_pdf = Eigen::MatrixXf(n_meas,n_meas);
     w_new = Eigen::MatrixXf(1,1);
     w_new_exponent = Eigen::MatrixXf(1,1);
@@ -258,7 +256,7 @@ void PhdFilter::phd_update()
 
         for (int j = 0; j < numTargets_Jk_k_minus_1; j++)
         {
-            thisZ.block(0,0, n_meas,1) = Z_k.block(0,z, n_meas,1);
+            thisZ = Z_k.block(0,z, n_meas,1);
 
             index = (L) * numTargets_Jk_k_minus_1 + j; //3~11
             ROS_DEBUG("Index: %d, L: %d\n", index, L);
@@ -277,8 +275,7 @@ void PhdFilter::phd_update()
 
             //update mean
             mk.block(0,index, n_state,1) = mk_k_minus_1.block(0,j, n_state,1);
-            meanDelta = thisZ.block(0,0, n_meas,1) - H*mk_k_minus_1.block(0,j, n_state,1);
-            mk.block(0,index, n_state, 1) =  mk_k_minus_1.block(0,j, n_state,1) + K.block(0,n_meas*j, n_state,n_meas)*meanDelta;
+            mk.block(0,index, n_state, 1) =  mk_k_minus_1.block(0,j, n_state,1) + K.block(0,n_meas*j, n_state,n_meas)*meanDelta_pdf;
             //update cov
             Pk.block(0,n_state*index, n_state,n_state) = P_k_k.block(0,n_state*j, n_state,n_state);
 
