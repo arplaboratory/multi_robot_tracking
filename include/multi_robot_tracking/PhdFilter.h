@@ -41,6 +41,7 @@ class PhdFilter
   void asynchronous_predict_existing();
   void removeColumn(Eigen::MatrixXd& matrix, unsigned int colToRemove);
   void removeColumnf(Eigen::MatrixXf& matrix, unsigned int colToRemove);
+  void removeColumni(Eigen::MatrixXi& matrix, unsigned int colToRemove);
 
   void initialize();
   void set_num_drones(int num_drones);
@@ -117,6 +118,7 @@ class PhdFilter
   Eigen::MatrixXf B;
 
   Eigen::MatrixXf Detections;
+  Eigen::MatrixXf mahalDistance;
 
   cv::Mat input_image;
   sensor_msgs::ImagePtr image_msg;

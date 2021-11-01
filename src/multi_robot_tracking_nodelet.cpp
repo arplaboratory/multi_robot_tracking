@@ -70,7 +70,7 @@ public:
     int id_right = 0;
 
 
-    bool consensus_sort_complete = false;
+    bool consensus_sort_complete = true;
 
     ros::Time img_timestamp;
     ros::Time prev_img_timestamp;
@@ -158,6 +158,8 @@ void multi_robot_tracking_Nodelet::init_matrices()
 
 
     id_consensus = Eigen::MatrixXd(1,num_drones);
+    id_consensus << id_left, id_right;
+
     id_array_init = Eigen::MatrixXd(1,num_drones);
 
     id_array_init(0) = id_left;
@@ -204,7 +206,10 @@ void multi_robot_tracking_Nodelet::draw_image()
         {
             Eigen::Vector2f temp_center;
             temp_center = jpdaf_filter_.tracks_[k].get_z();
-
+            int scaledX = floor(temp_center[0] * 640 / 224.0);
+            int scaledY = floor((temp_center[1]-28) * 480 / 240.0);
+            temp_center[0] = scaledX;
+            temp_center[1] = scaledY;
             cv::Point2f target_center(temp_center(0), temp_center(1));
             cv::Point2f id_pos(temp_center(0),temp_center(1)+10);
             cv::circle(input_image,target_center,4, cv::Scalar(0, 210, 255), 2);
@@ -226,12 +231,13 @@ void multi_robot_tracking_Nodelet::draw_image()
 
         //scale 224x224 to 640x480
 
-
+        float scaleX = input_image.cols / (float)detection_width;
+        float scaleY = input_image.rows / (float)detection_height;
 //        ROS_INFO("drawing phd estimation");
         for(int k=0; k < phd_filter_.X_k.cols(); k++)
         {
-            int scaledX = floor(phd_filter_.X_k(0,k) * 640 / 224.0);
-            int scaledY = floor((phd_filter_.X_k(2,k)-28) * 480 / 168.0);
+            int scaledX = floor((phd_filter_.X_k(0,k) + detection_offset_x) * scaleX);
+            int scaledY = floor((phd_filter_.X_k(2,k) + detection_offset_y) * scaleY);
 
             cv::Point2f target_center(scaledX,scaledY);
             cv::Point2f id_pos(scaledX,scaledY+10);
@@ -243,10 +249,10 @@ void multi_robot_tracking_Nodelet::draw_image()
         for (int k=0; k < phd_filter_.Z_k.cols(); k++)
         {
 
-            int scaledX = floor(phd_filter_.Detections(0,k) * 640 / 224.0);
-            int scaledY = floor((phd_filter_.Detections(1,k)-28) * 480 / 168.0);
-            float scaledW = phd_filter_.Detections(2,k) * 640 / 224.0;
-            float scaledH = phd_filter_.Detections(3,k) * 480 / 168.0;
+            int scaledX = floor((phd_filter_.Detections(0,k) + detection_offset_x) * scaleX);
+            int scaledY = floor((phd_filter_.Detections(1,k) + detection_offset_y) * scaleY);
+            float scaledW = phd_filter_.Detections(2,k) * scaleX;
+            float scaledH = phd_filter_.Detections(3,k) * scaleY;
 
 
             cv::Point2f measured_center(scaledX, scaledY);
@@ -331,17 +337,17 @@ void multi_robot_tracking_Nodelet::image_Callback(const sensor_msgs::ImageConstP
     //image timestamp is faster than detection result timestamp by approx 1 second. store image in buffer
     image_buffer_.push_back(img_msg);
 
-    ROS_INFO("img buff size: %lu",image_buffer_.size());
+    // ROS_INFO("img buff size: %lu",image_buffer_.size());
 
     //look up first image with timestamp smaller than
     for(int i = 0; i < image_buffer_.size(); i++)
     {
-        ROS_INFO("looking for timestamp less than: %f, image buff[i].stamp: %f",current_timestamp, image_buffer_[i]->header.stamp.toSec() );
+        // ROS_INFO("looking for timestamp less than: %f, image buff[i].stamp: %f",current_timestamp, image_buffer_[i]->header.stamp.toSec() );
         //if found image with matching detection sequence
         if(image_buffer_[i]->header.stamp.toSec() >= current_timestamp)
         {
-            ROS_INFO("detection timestamp: %f, image buff[i].stamp: %f", current_timestamp, image_buffer_[i]->header.stamp.toSec() );
-            ROS_INFO("FOUND IMG match");
+            // ROS_INFO("detection timestamp: %f, image buff[i].stamp: %f", current_timestamp, image_buffer_[i]->header.stamp.toSec() );
+            // ROS_INFO("FOUND IMG match");
             cout << "matched image buff index" << i << " Buffer Size: " << image_buffer_.size() <<endl;
             auto sync_image_ptr = image_buffer_[i];
             //store img pointer
@@ -353,7 +359,7 @@ void multi_robot_tracking_Nodelet::image_Callback(const sensor_msgs::ImageConstP
             draw_image();
 
             //remove from img buffer
-            //image_buffer_.erase(image_buffer_.begin() + i);
+            image_buffer_.erase(image_buffer_.begin() + i);
 
             break;
         }
@@ -372,7 +378,13 @@ void multi_robot_tracking_Nodelet::imu_Callback(const sensor_msgs::ImuConstPtr &
     ros::Duration timeDifIMU = imu_msg->header.stamp - imu_timestamp;
     phd_filter_.dt_imu = timeDifIMU.toSec();
     ROS_WARN("imu time: %f", phd_filter_.dt_imu);
-
+    imu_.angular_velocity = imu_msg->angular_velocity;
+    imu_.angular_velocity_covariance = imu_msg->angular_velocity_covariance;
+    imu_.header = imu_msg->header;
+    imu_.linear_acceleration = imu_msg->linear_acceleration;
+    imu_.linear_acceleration_covariance = imu_msg->linear_acceleration_covariance;
+    imu_.orientation = imu_msg->orientation;
+    imu_.orientation_covariance = imu_msg->orientation_covariance;
     if(phd_filter_.first_callback == false)
     {
         phd_filter_.ang_vel_k(0) = imu_msg->angular_velocity.x;
@@ -429,7 +441,7 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
 
     ROS_WARN("bbox time: %f, dt: %f, imu time: %f",current_timestamp, delta_timestamp, imu_time);
 
-    ROS_INFO("detected size: %lu ", in_PoseArray.poses.size() );
+    // ROS_INFO("detected size: %lu ", in_PoseArray.poses.size() );
     jpdaf_filter_.last_timestamp_synchronized = in_PoseArray.header.stamp.toSec();
 
     //store Z
@@ -481,9 +493,9 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
             phd_filter_.Detections(2,i) = in_PoseArray.poses[i].orientation.x;
             phd_filter_.Detections(3,i) = in_PoseArray.poses[i].orientation.y;
         }
-
-        cout << "Z_k_CB: " << endl << phd_filter_.Z_k << endl;
-
+        cout << "Num Meas: " << phd_filter_.detected_size_k << "\n";
+        cout << "Z_k_CB: " << endl << phd_filter_.Z_k << "\n";
+        cout << "WK-1: " << phd_filter_.wk << "\n";
         if(phd_filter_.first_callback)
         {
             delta_timestamp = 0.143; //0.225
@@ -531,6 +543,7 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
 
             consensus_sort();
 
+            // imu_timestamp = in_PoseArray.header.stamp;
         }
     }
 
@@ -720,7 +733,10 @@ void multi_robot_tracking_Nodelet::onInit(void)
     priv_nh.param<int>("viz_detection_offset_x", detection_offset_x, 0);
     priv_nh.param<int>("viz_detection_offset_y", detection_offset_y, 28);
 
+    priv_nh.param<bool>("do_consensus_init", consensus_sort_complete,0);
+    consensus_sort_complete = !consensus_sort_complete;
 
+    ROS_INFO_STREAM("Consensus sort during init " << !consensus_sort_complete);
 
     if(filter_to_use_.compare("phd") == 0) //using phd
     {

@@ -8,19 +8,21 @@ init_pos_x_left: 3.4641
 init_pos_y_left: 2.0
 init_pos_x_right: 3.4641
 init_pos_y_right: -2.0
-id_self: 2
+id_self: 0
 id_left: 1
-id_right: 4
+id_right: 2
   
-camera_cx: 329
-camera_cy: 243
-camera_f: 431
+camera_cx: 180
+camera_cy: 120
+camera_f: 120
 
 dt: 0.225
   
-viz_detection_height: 168
-viz_detection_width: 224
+viz_detection_height: 240
+viz_detection_width: 320
 viz_detection_offset_x: 0
-viz_detection_offset_y: 28
+viz_detection_offset_y: 0
 
 enable_async_pdf: true
+
+do_init_consensus: false
