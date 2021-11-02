@@ -94,10 +94,10 @@ void PhdFilter::initialize()
     Eigen::MatrixXf P_k_init;
     P_k_init = Eigen::MatrixXf(n_state,n_state);
     P_k_init <<
-            10,0,0,0,
-            0,5,0,0,
-            0,0,10,0,
-            0,0,0,5;
+            5,0,0,0,
+            0,2,0,0,
+            0,0,5,0,
+            0,0,0,2;
 
 
     for(int i = 0; i < Z_k.cols(); i ++)
@@ -123,11 +123,11 @@ void PhdFilter::initialize()
          0, 0, 1, 0;
 
     //Process noise covariance, given in Vo&Ma.
-    Q << 6.25,      25,     0,          0,
+    Q << 6.25,      0,      0,          0,
          0,         12.5,   0,          0,
-         0,         0,      6.25,       25,
+         0,         0,      6.25,       0,
          0,         0,      0,          12.5;
-    Q = Q*1.0;  //0.01 works well for exp3
+    Q = Q*0.45;  //0.01 works well for exp3
 
     //Measurement Noise
     R << 45,   0,
@@ -320,7 +320,7 @@ void PhdFilter::phd_update()
             old_weight = wk(index);
 //            float measZx = Z_k(0,i);
 //            float measZy = Z_k(1,i);
-            wk(index) = old_weight / (weight_tally);//( clutter_intensity(X_k(0,i),X_k(2,i))+ weight_tally);
+            wk(index) = old_weight / (clutter_intensity(X_k(0,i),X_k(2,i))/20.0+ weight_tally);
 //            wk(index) = old_weight / ( weight_tally);
         }
 
@@ -556,7 +556,7 @@ void PhdFilter::phd_state_extract()
     velocity = Eigen::MatrixXf(2,1);
     position = Eigen::MatrixXf(2,1);
     float gain_fine_tuned = 1;
-    float weight_threshold_for_extraction = 0.1;
+    float weight_threshold_for_extraction = 0.5;
     //update state for next iterations
     // wk_minus_1 = wk_bar_fixed;
     // mk_minus_1 = mk_bar_fixed;
