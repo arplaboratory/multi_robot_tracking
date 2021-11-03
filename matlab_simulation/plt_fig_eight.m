@@ -1,5 +1,5 @@
-Asynch = readmatrix('/home/marklee/Desktop/RAL2021/Asynch_fig8_v2.csv');
-Synch = readmatrix('/home/marklee/Desktop/RAL2021/Synch_fig8v2.csv');
+Asynch = readmatrix('Asynch_fig8_v2.csv');
+Synch = readmatrix('Synch_fig8v2.csv');
 
 GND_x1 = Asynch(:,3);
 est_x1 = Asynch(:,7);

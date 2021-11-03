@@ -8,10 +8,10 @@
 
 if(USE_REAL_DATA)
     %% Read Rosbag and fill in PX, PY
-    real_bag = rosbag("/home/marklee/rosbag/maxim_glass_tracking.bag");
-    bbox_bag = select(real_bag, 'Topic', "/darknet_ros/bounding_boxes");
-    glass_bag = select(real_bag, 'Topic', "/vicon/TobiiGlasses/odom");
-    drone1_bag = select(real_bag, 'Topic', "/vicon/DragonFly1/odom");
+    real_bag = rosbag("drone_2d_3drones_imu.bag");
+    bbox_bag = select(real_bag, 'Topic', "/hummingbird0/camera/bounding_box");
+    glass_bag = select(real_bag, 'Topic', "/hummingbird0/imu");
+    drone1_bag = select(real_bag, 'Topic', "/hummingbird0/track/bounding_box");
     
     
     %get bbox topic
@@ -32,7 +32,7 @@ if(USE_REAL_DATA)
     
 else
     %% Read Rosbag and fill in PX, PY
-    measure_bag = rosbag("/rosbag/drone_2d_3drones_imu.bag");
+    measure_bag = rosbag("drone_2d_3drones_imu.bag");
     pos_bag = select(measure_bag, 'Topic', "/hummingbird0/track/bounding_box");
     imu_bag = select(measure_bag, 'Topic', "/hummingbird0/imu");
 
