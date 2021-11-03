@@ -16,7 +16,6 @@ class flightmareTest:
                             [0, 0, 2], [4, -1, 2], [2, 1 ,2],
                             [0, 0, 2], [4, 0, 3], [2, 0, 1], 
                             [0, 0, 2], [4, 0, 1], [2, 0, 3], 
-                            [0, 0, 2], [4, 0, 3], [2, 0, 1], 
                             [4, 4, 2], [8, 4, 3], [6, 4, 1]]
         
         self.sleep_times = [14, 10, 10, 10, 10, 10, 10 ,10 ,10 ,10 ,10 ,10 ,10 ,10 ,10]
@@ -32,6 +31,8 @@ class flightmareTest:
         self.land_topic = "/autopilot/land"
         self.arm_topic = "/bridge/arm"
 
+        rospy.loginfo("Starting")
+
         for i in range(self.num_drones):
             self.position_publishers.append(rospy.Publisher(self.drone_namespace+str(i)+self.position_topic, ps, queue_size=1))
             self.takeoff_publishers.append(rospy.Publisher(self.drone_namespace+str(i)+self.takeoff_topic, e, queue_size=1))
@@ -43,16 +44,19 @@ class flightmareTest:
         true_msg = bo()
         true_msg.data = True
 
+        rospy.loginfo("Arming")
+
         for i in range(self.num_drones):
             self.arm_publishers[i].publish(true_msg)
         
+        rospy.loginfo("Takeoff command sent")
         time.sleep(1)
         for i in range(self.num_drones):
             self.takeoff_publishers[i].publish(e())
-        
-        time.sleep(2)
+        time.sleep(5)
         
 
+        rospy.loginfo("Sending waypoints")
         for i in range(int(len(self.setpoints)/3)):
             for ii in range(self.num_drones):
                 pose_command = ps()
@@ -61,7 +65,7 @@ class flightmareTest:
                 pose_command.pose.position.y = self.setpoints[(i*3)+ii][1]
                 pose_command.pose.position.z = self.setpoints[(i*3)+ii][2]
                 self.position_publishers[ii].publish(pose_command)
-            print("sent command ", i)
+            rospy.loginfo("sent command " + str(i))
             time.sleep(self.sleep_times[i])
             if(rospy.is_shutdown()):
                 break

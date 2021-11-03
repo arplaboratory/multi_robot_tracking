@@ -98,6 +98,7 @@ void PhdFilter::initialize()
             0,2,0,0,
             0,0,5,0,
             0,0,0,2;
+    P_k_init = P_k_init * 1;
 
 
     for(int i = 0; i < Z_k.cols(); i ++)
@@ -127,11 +128,12 @@ void PhdFilter::initialize()
          0,         12.5,   0,          0,
          0,         0,      6.25,       0,
          0,         0,      0,          12.5;
-    Q = Q*0.45;  //0.01 works well for exp3
+    Q = Q*1.0;  //0.01 works well for exp3
 
     //Measurement Noise
-    R << 45,   0,
-         0,     45;
+    R << 10,   0,
+         0,     10;
+    R = R*4.5;
 
     numTargets_Jk_minus_1 = NUM_DRONES;
 }
@@ -193,9 +195,9 @@ void PhdFilter::asynchronous_predict_existing()
     Pk_k_minus_1 = Pk_minus_1;
     numTargets_Jk_k_minus_1 = numTargets_Jk_minus_1;
 
-    // ROS_INFO_STREAM("WK|K-1:\n" << wk_k_minus_1 << endl);
-    // ROS_INFO_STREAM("mK|K-1:\n" << mk_k_minus_1 << endl);
-    // ROS_INFO_STREAM("PK|K-1:\n" << Pk_k_minus_1 << endl);
+    ROS_INFO_STREAM("WK|K-1:\n" << wk_k_minus_1 << endl);
+    ROS_INFO_STREAM("mK|K-1:\n" << mk_k_minus_1 << endl);
+    ROS_INFO_STREAM("PK|K-1:\n" << Pk_k_minus_1 << endl);
 }
 
 
@@ -222,6 +224,7 @@ void PhdFilter::phd_construct()
         Eigen::MatrixXf t1 = (identity4 - K.block(0,n_meas*j, n_state,n_meas)*H)*Pk_k_minus_1.block(0,n_state*j, n_state,n_state);
         P_k_k.block(0,n_state*j, n_state,n_state) = t1;
     }
+    ROS_INFO_STREAM("m_k_minus_1:\n" << mk_minus_1 << "\n");
     ROS_INFO_STREAM("P_k_k: " << endl << P_k_k << endl);
     ROS_INFO_STREAM("K: " << endl << K << endl);
 }
@@ -555,21 +558,25 @@ void PhdFilter::phd_state_extract()
     Eigen::MatrixXf velocity, position;
     velocity = Eigen::MatrixXf(2,1);
     position = Eigen::MatrixXf(2,1);
-    float gain_fine_tuned = 1;
+    float gain_fine_tuned = 1.0;
     float weight_threshold_for_extraction = 0.5;
+
+    ROS_INFO_STREAM("DT Cam: " << dt_cam << "\n");
     //update state for next iterations
-    // wk_minus_1 = wk_bar_fixed;
-    // mk_minus_1 = mk_bar_fixed;
-    // Pk_minus_1 = Pk_bar_fixed.cwiseAbs();
+    
 
     
     // ROS_DEBUG_STREAM("--- X_k: " << endl << X_k << endl);
     // X_k = mk_minus_1;
     if(k_iteration > 3)
     {
+        //update state for next iterations
         // wk_minus_1 = wk_bar_fixed;
         // mk_minus_1 = mk_bar_fixed;
         // Pk_minus_1 = Pk_bar_fixed.cwiseAbs();
+
+        // X_k = mk_minus_1;
+        // cout << "--- X_k: " << endl << X_k << endl;
         for(int i=0; i<wk_bar_fixed.cols(); i++)
         {
             if(wk_bar_fixed(i) < weight_threshold_for_extraction)
@@ -582,6 +589,9 @@ void PhdFilter::phd_state_extract()
             else
             {
                 X_k.block(0, i, n_state, i) = mk_bar_fixed.block(0, i, n_state, i);
+                wk_minus_1.block(0, i, 1, 1) = wk_bar_fixed.block(0, i, 1, 1);
+                mk_minus_1.block(0, i, n_state, 1) = mk_bar_fixed.block(0, i, n_state, 1);
+                Pk_minus_1.block(0, n_state*i, n_state, n_state) = Pk_bar_fixed.block(0, n_state*i, n_state, n_state).cwiseAbs();
             }
         }
         ROS_INFO_STREAM("mK in extract: \n" << mk_minus_1);
@@ -594,6 +604,7 @@ void PhdFilter::phd_state_extract()
         wk_minus_1 = wk_bar_fixed;
         mk_minus_1 = mk_bar_fixed;
         Pk_minus_1 = Pk_bar_fixed.cwiseAbs();
+        X_k = mk_minus_1;
     }
     if (k_iteration > 3)
     {
@@ -605,6 +616,7 @@ void PhdFilter::phd_state_extract()
             mk_minus_1.block<1,1>(1,i) = velocity.block<1,1>(0,0);
             mk_minus_1.block<1,1>(3,i) = velocity.block<1,1>(1,0);
             ROS_INFO_STREAM("--- position: " << endl << position << endl);
+            ROS_INFO_STREAM("--- dt_cam: " << endl << dt_cam << endl);
             ROS_INFO_STREAM("--- dt: " << endl << dt << endl);
             ROS_INFO_STREAM("--- velocity: " << endl << velocity << endl);
         }
@@ -614,6 +626,7 @@ void PhdFilter::phd_state_extract()
     mk_minus_1 = mk_bar_fixed;
     Pk_minus_1 = Pk_bar_fixed.cwiseAbs();
     X_k_previous = X_k;
+    
 }
 
 
