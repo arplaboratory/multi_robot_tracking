@@ -31,7 +31,8 @@ class PhdFilter
   PhdFilter();
 
   void initialize_matrix(float cam_cu, float cam_cv, float cam_f, float meas_dt=0.225);
-  void initialize_matrix();
+  void initialize(float q_pos, float q_vel, float r_meas, float p_pos_init, float p_vel_init,
+                float prune_weight_threshold, float prune_mahalanobis_threshold, float extract_weight_threshold);
   void phd_track();
   void phd_predict_existing();
   void phd_construct();
@@ -43,7 +44,6 @@ class PhdFilter
   void removeColumnf(Eigen::MatrixXf& matrix, unsigned int colToRemove);
   void removeColumni(Eigen::MatrixXi& matrix, unsigned int colToRemove);
 
-  void initialize();
   void set_num_drones(int num_drones);
   float clutter_intensity(const float X, const float Y);
   Eigen::MatrixXf left_divide(const Eigen::MatrixXf);

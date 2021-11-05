@@ -25,4 +25,14 @@ viz_detection_offset_y: 0
 
 enable_async_pdf: true
 
-do_init_consensus: false
+use_generated_id: true
+
+phd: 
+  q_pos: 6.25
+  q_vel: 12.5
+  r_meas: 45
+  p_pos_init: 5.0
+  p_vel_init: 2.0
+  prune_weight_threshold: 0.1
+  prune_mahalanobis_threshold: 4.0
+  extract_weight_threshold: 0.5

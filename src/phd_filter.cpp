@@ -89,15 +89,16 @@ void PhdFilter::set_num_drones(int num_drones_in)
     NUM_DRONES = num_drones_in;
 }
 
-void PhdFilter::initialize()
+void PhdFilter::initialize(float q_pos, float q_vel, float r_meas, float p_pos_init, float p_vel_init,
+                        float prune_weight_threshold, float prune_mahalanobis_threshold, float extract_weight_threshold)
 {
     Eigen::MatrixXf P_k_init;
     P_k_init = Eigen::MatrixXf(n_state,n_state);
     P_k_init <<
-            5,0,0,0,
-            0,2,0,0,
-            0,0,5,0,
-            0,0,0,2;
+            p_pos_init, 0,          0,          0,
+            0,          p_vel_init, 0,          0,
+            0,          0,          p_pos_init, 0,
+            0,          0,          0,          p_vel_init;
     P_k_init = P_k_init * 1;
 
 
@@ -124,16 +125,14 @@ void PhdFilter::initialize()
          0, 0, 1, 0;
 
     //Process noise covariance, given in Vo&Ma.
-    Q << 6.25,      0,      0,          0,
-         0,         12.5,   0,          0,
-         0,         0,      6.25,       0,
-         0,         0,      0,          12.5;
-    Q = Q*1.0;  //0.01 works well for exp3
+    Q << q_pos,     0,      0,          0,
+         0,         q_vel,  0,          0,
+         0,         0,      q_pos,      0,
+         0,         0,      0,          q_vel;
 
     //Measurement Noise
-    R << 10,   0,
-         0,     10;
-    R = R*4.5;
+    R << r_meas,    0,
+         0,         r_meas;
 
     numTargets_Jk_minus_1 = NUM_DRONES;
 }

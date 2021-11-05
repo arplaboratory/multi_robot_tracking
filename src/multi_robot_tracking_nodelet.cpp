@@ -140,6 +140,13 @@ public:
     //Camera frame size
     int image_height, image_width;
 
+    //phd_filter_parameters
+    float q_pos, q_vel, r_meas;
+    float p_pos_init, p_vel_init;
+    float phd_prune_weight_threshold;
+    float phd_prune_mahalanobis_dist_threshold;
+    float phd_extract_weight_threshold;
+
     //output csv file
     ofstream outputFile;
 };
@@ -359,7 +366,7 @@ void multi_robot_tracking_Nodelet::image_Callback(const sensor_msgs::ImageConstP
             draw_image();
 
             //remove from img buffer
-            image_buffer_.erase(image_buffer_.begin() + i);
+            // image_buffer_.erase(image_buffer_.begin() + i);
 
             break;
         }
@@ -501,7 +508,10 @@ void multi_robot_tracking_Nodelet::detection_Callback(const geometry_msgs::PoseA
             delta_timestamp = 0.143; //0.225
             phd_filter_.dt_cam = delta_timestamp;
 
-            phd_filter_.initialize();
+            phd_filter_.initialize(q_pos, q_vel, r_meas, p_pos_init, p_vel_init,
+                                phd_prune_weight_threshold,
+                                phd_prune_mahalanobis_dist_threshold,
+                                phd_extract_weight_threshold);
             phd_filter_.first_callback = false;
 
             previous_timestamp = current_timestamp;
@@ -732,11 +742,19 @@ void multi_robot_tracking_Nodelet::onInit(void)
     priv_nh.param<int>("viz_detection_width", detection_width, 224);
     priv_nh.param<int>("viz_detection_offset_x", detection_offset_x, 0);
     priv_nh.param<int>("viz_detection_offset_y", detection_offset_y, 28);
+    priv_nh.param<bool>("use_generated_id", consensus_sort_complete,0);
 
-    priv_nh.param<bool>("do_consensus_init", consensus_sort_complete,0);
-    consensus_sort_complete = !consensus_sort_complete;
+    priv_nh.param<float>("phd/q_pos", q_pos, 6.25);
+    priv_nh.param<float>("phd/q_vel", q_vel, 12.5);
+    priv_nh.param<float>("phd/p_pos_init", p_pos_init, 5.0);
+    priv_nh.param<float>("phd/p_vel_init", p_vel_init, 2.0);
+    priv_nh.param<float>("phd/r_meas", r_meas, 45);
+    priv_nh.param<float>("phd/prune_weight_threshold", phd_prune_weight_threshold, 1e-1);
+    priv_nh.param<float>("phd/prune_mahalanobis_threshold_", phd_prune_mahalanobis_dist_threshold, 4.0);
+    priv_nh.param<float>("phd/extract_weight_threshold", phd_extract_weight_threshold, 5e-1);
+    
 
-    ROS_INFO_STREAM("Consensus sort during init " << !consensus_sort_complete);
+    ROS_INFO_STREAM("Consensus sort during init " << consensus_sort_complete);
 
     if(filter_to_use_.compare("phd") == 0) //using phd
     {
