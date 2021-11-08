@@ -64,7 +64,7 @@ $ catkin build
 $ source devel/setup.bash
 ```
 
-retrieve exp2 rosbag data from [ARPL data folder](https://www.dropbox.com/sh/55imrqmq8zw33e4/AABo3ZWFqI6xFkJAcrBf3ko2a?dl=0) after gaining access
+retrieve exp2 rosbag data from [ARPL data folder](https://drive.google.com/drive/folders/1dSBd08ocj_x8MGDS-cl1F2HeHKFADlqP?usp=sharing) after gaining access
 
 ## Running
 This pacakge runs the tracking filter only -- it doesn't provide image detection. If image detection package is not available, can run with either by recorded rosbag data or by acquiring ground truth detection from simulation. Boths options are shown below. Specifiy filter rosparam in the demo.launch file to select phd or jpdaf filter. 
@@ -76,7 +76,6 @@ $ roslaunch multi_robot_tracking demo.launch
 A. Testing with recorded Rosbag. </br>
 Move rosbag data into corresponding directory. Modify the rostopic subscriber in demo.launch if wanting to modify using a different measured input.
 ```
-$ roscd multi_robot_tracking/launch/
 $ roslaunch multi_robot_tracking demo.launch
 -- open a new tab and navigate to rosbag directory
 $ rosbag play "bag_file_name".bag --clock 
