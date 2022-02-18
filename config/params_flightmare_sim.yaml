@@ -1,5 +1,5 @@
 input_bbox_topic: "/hummingbird0/track/bounding_box"
-input_img_topic: "/hummingbird0/camera/rgb"
+input_img_topic: "/hummingbird0/camera/bounding_box"
 input_imu_topic: "/hummingbird0/imu"
 
 init_pos_self_x: 0.0
@@ -30,9 +30,9 @@ use_generated_id: true
 phd: 
   q_pos: 6.25
   q_vel: 12.5
-  r_meas: 45
+  r_meas: 10
   p_pos_init: 5.0
-  p_vel_init: 2.0
+  p_vel_init: 10.0
   prune_weight_threshold: 0.1
   prune_mahalanobis_threshold: 4.0
   extract_weight_threshold: 0.5

@@ -6,14 +6,15 @@ Kalman::Kalman(const float& px, const float& py, const float& vx, const float& v
 {
 
   params.R << 2, 0, 0, 2;
-  params.T << 50000, 50000;
+  params.T << 100, 100;
 
-  params.P_0 << 20, 0, 0, 0,
+  params.P_0 << 10, 0, 0, 0,
                  0, 20, 0, 0,
-                 0, 0, 8, 0,
-                 0, 0, 0, 8;
+                 0, 0, 10, 0,
+                 0, 0, 0, 20;
 
-  params.principal_point << 489.72, 267.87;
+  params.principal_point << 180, 120;
+  params.focal_length = 120;
 
 
   //CONTROL INPUT model Matrix
@@ -61,8 +62,8 @@ void Kalman::predict(const float dt, const Eigen::Vector3f omega)
   //Lets try an other way:
   Eigen::Matrix4f Q;
   Q << std::pow(dt, 2)*T(0)/2, 0, 0, 0,
-       0, dt*T(0), 0, 0,
-       0, 0, std::pow(dt, 2)*T(1)/2, 0,
+       0, dt*T(1), 0, 0,
+       0, 0, std::pow(dt, 2)*T(0)/2, 0,
        0, 0, 0, dt*T(1);
 
 
@@ -80,6 +81,14 @@ void Kalman::predict(const float dt, const Eigen::Vector3f omega)
   B(2,1) = -((z(0)-c(0))*(z(1)-c(1)))/(alpha*f);
   B(2,2) = -(z(0)-c(0))/alpha;
 
+  B(1,0) = 0;
+  B(1,1) = 0;
+  B(1,2) = 0;
+
+  B(3,0) = 0;
+  B(3,1) = 0;
+  B(3,2) = 0;
+  
   if((isnan(B.array())).any()) // may happen if one track flies to infinity. The return is just to avoid a crash
   {
     ROS_FATAL("B contains NaNs");
@@ -100,6 +109,12 @@ void Kalman::predict(const float dt, const Eigen::Vector3f omega)
   x = A*x + ang_vel;
 
 //  cout << "x predict:" << endl << x << endl;
+  Eigen::MatrixXf F = Eigen::MatrixXf(4, 4);
+  F(0,0) = (dt*u(1)*(2*c(0) - 2*z(0)))/f - (dt*u(0)*(c(1) - z(1)))/f + 1;       F(0,1) = dt;   F(0,2) = dt*u(2) - (dt*u(0)*(c(0) - z(0)))/f;                            F(0,3) = 0;
+  F(2,0) = 0;                                                                   F(2,1) = 1;    F(2,2) = 0;                                                              F(2,3) = 0;
+  F(1,0) = (dt*u(1)*(c(1) - z(1)))/f - dt*u(2);                                 F(1,1) = 0;    F(1,2) = (dt*u(1)*(c(0) - z(0)))/f - (dt*u(0)*(2*c(1) - 2*z(1)))/f + 1;  F(1,3) = dt;
+  F(3,0) = 0;                                                                   F(3,1) = 0;    F(3,2) = 0;                                                              F(3,3) = 1;
+
 
   P = A * P * A.transpose() + Q;  //ttt
 
@@ -138,7 +153,7 @@ void Kalman::update(const std::vector<Detection> detections, const std::vector<d
 {
 
   K = P * C.transpose() * S.inverse();
-//  cout << "K:" << endl << K << endl;
+  cout << "K:" << endl << K << endl;
 
   std::vector<Eigen::Vector2f> nus;
   for(uint i=0; i<detections.size(); i++)

@@ -132,11 +132,12 @@ void JpdafFilter::track(bool called_from_detection)
           auto betas_matrix = compute_betas_matrix(hypothesis_mats, hypothesis_probs);
 //            cout << "betas_matrix: " << endl << betas_matrix << endl;
 
-
           std::vector<double> betas_0;
           for(uint t=0; t<tracks_.size(); t++)
           {
+              ROS_INFO("1");
               std::vector<double> beta(betas_matrix.rows());
+              ROS_INFO("2");
               double beta_0 = 1.0;
               for(int m=0; m<betas_matrix.rows(); m++)
               {
@@ -554,9 +555,9 @@ std::vector<Track> JpdafFilter::create_new_tracks(std::vector<Detection> detecti
                     B(0,1) = -(params.focal_length*params.alpha_cam + (unassoc_detections.at(j).x()-params.principal_point(0))*(unassoc_detections.at(j).x()-params.principal_point(0))/(params.focal_length*params.alpha_cam));
                     B(0,2) = params.alpha_cam*(unassoc_detections.at(j).y()-params.principal_point(1));
 
-                    B(1,0) = (params.focal_length + (unassoc_detections.at(j).y()-params.principal_point(1))*(unassoc_detections.at(j).y()-params.principal_point(1))/params.focal_length);
-                    B(1,1) = -((unassoc_detections.at(j).x()-params.principal_point(0))*(unassoc_detections.at(j).y()-params.principal_point(1)))/(params.alpha_cam*params.focal_length);
-                    B(1,2) = -(unassoc_detections.at(j).x()-params.principal_point(0))/params.alpha_cam;
+                    B(2,0) = (params.focal_length + (unassoc_detections.at(j).y()-params.principal_point(1))*(unassoc_detections.at(j).y()-params.principal_point(1))/params.focal_length);
+                    B(2,1) = -((unassoc_detections.at(j).x()-params.principal_point(0))*(unassoc_detections.at(j).y()-params.principal_point(1)))/(params.alpha_cam*params.focal_length);
+                    B(2,2) = -(unassoc_detections.at(j).x()-params.principal_point(0))/params.alpha_cam;
 
                     auto speed_offset = B*omega;
 

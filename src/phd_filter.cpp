@@ -92,6 +92,7 @@ void PhdFilter::set_num_drones(int num_drones_in)
 void PhdFilter::initialize(float q_pos, float q_vel, float r_meas, float p_pos_init, float p_vel_init,
                         float prune_weight_threshold, float prune_mahalanobis_threshold, float extract_weight_threshold)
 {
+    ROS_INFO("======= Initialize ======= \n");
     Eigen::MatrixXf P_k_init;
     P_k_init = Eigen::MatrixXf(n_state,n_state);
     P_k_init <<
@@ -165,8 +166,8 @@ void PhdFilter::asynchronous_predict_existing()
     //ROS_INFO_STREAM("A:\n" << A << endl);
     for (int i = 0; i < mk_minus_1.cols(); i++)
     {
-        float qAcc = sqrt((mk_k_minus_1(1, i))*(mk_k_minus_1(1, i)) + (mk_k_minus_1(3, i)*(mk_k_minus_1(3, i))));
-        qAcc = ((qAcc*2)+1);
+        // float qAcc = sqrt((mk_k_minus_1(1, i))*(mk_k_minus_1(1, i)) + (mk_k_minus_1(3, i)*(mk_k_minus_1(3, i))));
+        // qAcc = ((qAcc*2)+1);
         // ROS_INFO_STREAM("!!!!!!!!!!QACC = " << qAcc);
         Eigen::MatrixXf Q_temp = Q;
         Q_temp = Q;// * qAcc;
@@ -176,8 +177,8 @@ void PhdFilter::asynchronous_predict_existing()
         // ROS_INFO_STREAM("Bu:\n" << Bu_temp); 
         mk_minus_1.block(0,i, n_state,1) = A * mk_minus_1.block(0,i, n_state,1) + Bu_temp;
         P_temp = Pk_minus_1.block(0,n_state*i, n_state,n_state);
-        pu = X_k(0,i);
-        pv = X_k(2,i);
+        pu = mk_minus_1(0,i);
+        pv = mk_minus_1(2,i);
 
         F(0,0) = (dt_imu*omega_y*(2*cu - 2*pu))/f - (dt_imu*omega_x*(cv - pv))/f + 1;      F(0,1) = dt;   F(0,2) = dt_imu*omega_z - (dt_imu*omega_x*(cu - pu))/f;                            F(0,3) = 0;
         F(1,0) = 0;                                                                        F(1,1) = 1;    F(1,2) = 0;                                                                        F(1,3) = 0;
@@ -322,7 +323,7 @@ void PhdFilter::phd_update()
             old_weight = wk(index);
 //            float measZx = Z_k(0,i);
 //            float measZy = Z_k(1,i);
-            wk(index) = old_weight / (clutter_intensity(X_k(0,i),X_k(2,i))/20.0+ weight_tally);
+            wk(index) = old_weight / (clutter_intensity(X_k(0,i),X_k(2,i))/1.0+ weight_tally);
 //            wk(index) = old_weight / ( weight_tally);
         }
 
@@ -580,6 +581,7 @@ void PhdFilter::phd_state_extract()
         {
             if(wk_bar_fixed(i) < weight_threshold_for_extraction)
             {
+                ROS_INFO("!!11");
                 X_k.block(0, i, n_state, 1) = mk_minus_1.block(0, i, n_state, 1);
                 mk_bar_fixed.block(0, i, n_state, 1) = mk_minus_1.block(0, i, n_state, 1);
                 wk_bar_fixed(i) = wk_minus_1(i);
@@ -587,10 +589,15 @@ void PhdFilter::phd_state_extract()
             }
             else
             {
-                X_k.block(0, i, n_state, i) = mk_bar_fixed.block(0, i, n_state, i);
+                ROS_INFO("!!22");
+                X_k.block(0, i, n_state, 1) = mk_bar_fixed.block(0, i, n_state, 1);
+                ROS_INFO("!!aa");
                 wk_minus_1.block(0, i, 1, 1) = wk_bar_fixed.block(0, i, 1, 1);
+                ROS_INFO("!!bb");
                 mk_minus_1.block(0, i, n_state, 1) = mk_bar_fixed.block(0, i, n_state, 1);
+                ROS_INFO("!!cc");
                 Pk_minus_1.block(0, n_state*i, n_state, n_state) = Pk_bar_fixed.block(0, n_state*i, n_state, n_state).cwiseAbs();
+                ROS_INFO("!!33");
             }
         }
         ROS_INFO_STREAM("mK in extract: \n" << mk_minus_1);
