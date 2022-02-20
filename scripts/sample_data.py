@@ -11,7 +11,7 @@ class poseArrayPubber:
         pa = PoseArray()
 
         paPub = rospy.Publisher("/hummingbird0/track/bounding_box", PoseArray, queue_size=1)
-        nSamples = 3
+        nSamples = 2
         for i in range(nSamples):
             p = Pose()
             p.position.x = 10*(i+1)
@@ -22,7 +22,8 @@ class poseArrayPubber:
         
         rate = rospy.Rate(8)
         for i in range(100):
-            print(pa)
+            pa.header.stamp = rospy.Time.now()
+            pa.header.seq += 1
             paPub.publish(pa)
             rate.sleep()
 
