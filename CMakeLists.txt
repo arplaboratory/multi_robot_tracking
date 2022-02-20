@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0.2)
 project(multi_robot_tracking)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+add_compile_options(-std=c++11)
 
 
 find_package(catkin REQUIRED COMPONENTS
@@ -11,7 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
   tf
-  cv_bridge
+#  cv_bridge
   nav_msgs
   image_transport
 )
