@@ -96,7 +96,6 @@ class KalmanFilter
   Eigen::MatrixXf Detections;
   Eigen::MatrixXf mahalDistance;
 
-  cv::Mat input_image;
   sensor_msgs::ImagePtr image_msg;
 
   float cu, cv, f;
