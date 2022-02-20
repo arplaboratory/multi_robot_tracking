@@ -1,9 +1,10 @@
 #include <ros/console.h>
 #include <tf/transform_datatypes.h>
 #include "multi_robot_tracking/PhdFilter.h"
-
+#include <chrono>
 
 using namespace std;
+using namespace std::chrono;
 
 PhdFilter::PhdFilter()
 
@@ -13,18 +14,51 @@ PhdFilter::PhdFilter()
 
 void PhdFilter::phd_track()
 {
+    auto time_start = high_resolution_clock::now();
+    startTime = ros::Time::now();
+    k_iteration = k_iteration + 1;
+    ROS_INFO("iter: %d",k_iteration);
+
+    //kalmanPredict(); // ToDo: Can be asynch ???
+    auto time_endP = high_resolution_clock::now();
+    auto durationP = duration_cast<std::chrono::microseconds>(time_endP - time_start);
+    ROS_ERROR_STREAM("Time taken by function predict: " << durationP.count() << " microseconds" << endl);
+
+    phd_construct();
+    auto time_endI = high_resolution_clock::now();
+    auto durationI = duration_cast<std::chrono::microseconds>(time_endI - time_endP);
+    ROS_ERROR_STREAM("Time taken by function Issue: " << durationI.count() << " microseconds" << endl);
+
+    phd_update();
+    auto time_endA = high_resolution_clock::now();
+    auto durationA = duration_cast<std::chrono::microseconds>(time_endA - time_endI);
+    ROS_ERROR_STREAM("Time taken by function Associate: " << durationA.count() << " microseconds" << endl);
+
+    phd_prune();
+    auto time_endU = high_resolution_clock::now();
+    auto durationU = duration_cast<std::chrono::microseconds>(time_endU - time_endA);
+    ROS_ERROR_STREAM("Time taken by function Update: " << durationU.count() << " microseconds" << endl);
+
+    phd_state_extract();
+    auto time_endE = high_resolution_clock::now();
+    auto durationE = duration_cast<std::chrono::microseconds>(time_endE - time_endU);
+    ROS_ERROR_STREAM("Time taken by function Extract: " << durationE.count() << " microseconds" << endl);
+
+    auto time_end = high_resolution_clock::now();
+    auto duration = duration_cast<std::chrono::microseconds>(time_end - time_start);
+    ROS_ERROR_STREAM("Time taken by function: " << duration.count() << " microseconds" << endl);
     startTime = ros::Time::now();
     k_iteration = k_iteration + 1;
     ROS_INFO("iter: %d",k_iteration);
 
     //construct
-    phd_construct();
+    
     //update
-    phd_update();
+    
     //prune
-    phd_prune();
+    
     //state extraction
-    phd_state_extract();
+    
 
     endTime = ros::Time::now();
     ROS_WARN("end of track iteration");
