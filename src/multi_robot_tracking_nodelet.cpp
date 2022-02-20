@@ -27,6 +27,8 @@
 #include <iostream>
 #include <fstream>
 
+#define VOXL
+
 using namespace std;
 
 bool want_export_toCSV = true;
@@ -42,7 +44,7 @@ public:
 
     //callback functions
     void detection_Callback(const geometry_msgs::PoseArray& in_PoseArray); //bbox to track
-    void image_Callback(const sensor_msgs::ImageConstPtr &img_msg); //rgb raw
+    // void image_Callback(const sensor_msgs::ImageConstPtr &img_msg); //rgb raw
     void imu_Callback(const sensor_msgs::ImuConstPtr &imu_msg); //rgb raw
     void ground_truth_Callback(const geometry_msgs::PoseArray& in_PoseArray); //bbox projection from ground truth
 
@@ -109,9 +111,11 @@ public:
     ros::Subscriber groundtruth_sub_;
 
     //output RGB data, pose data
+#ifdef HOST
     cv::Mat input_image;
     cv::Mat previous_image;
     sensor_msgs::ImagePtr image_msg;
+#endif
     sensor_msgs::Imu imu_;
 
 
@@ -211,7 +215,7 @@ void multi_robot_tracking_Nodelet::init_matrices()
  */
 void multi_robot_tracking_Nodelet::draw_image()
 {
-
+#ifdef HOST
     if(filter_to_use_.compare("jpdaf") == 0)
     {
         //          ROS_INFO("drawing jpdaf estimation");
@@ -335,6 +339,8 @@ void multi_robot_tracking_Nodelet::draw_image()
 
     //  ROS_WARN("img time: %f",prev_img_timestamp.toSec());
     //  ROS_WARN("bbox time: %f",bbox_timestamp.toSec());
+#endif
+    return;
 
 }
 
@@ -385,6 +391,7 @@ void multi_robot_tracking_Nodelet::ground_truth_Callback(const geometry_msgs::Po
  * input: RGB Image
  * output: N/A
  */
+#ifdef HOST
 void multi_robot_tracking_Nodelet::image_Callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
 
@@ -420,7 +427,7 @@ void multi_robot_tracking_Nodelet::image_Callback(const sensor_msgs::ImageConstP
 
     }
 }
-
+#endif
 /* callback for imu to store for faster motion prediction
  * input: IMU Image
  * output: N/A
@@ -936,7 +943,9 @@ void multi_robot_tracking_Nodelet::onInit(void)
     //bbox subscription of PoseArray Type
     detection_sub_ = priv_nh.subscribe(input_bbox_topic, 10, &multi_robot_tracking_Nodelet::detection_Callback, this);
     //img subscription
+#ifdef HOST
     image_sub_ = priv_nh.subscribe(input_img_topic, 10, &multi_robot_tracking_Nodelet::image_Callback, this);
+#endif
     //imu subscription
     imu_sub_ = priv_nh.subscribe(input_imu_topic, 10, &multi_robot_tracking_Nodelet::imu_Callback, this);
     //groundtruth bbox subscription
