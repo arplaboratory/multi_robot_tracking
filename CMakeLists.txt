@@ -26,7 +26,6 @@ catkin_package(
   roscpp
   std_msgs
   tf
-  cv_bridge
   DEPENDS
   EIGEN3
 )
@@ -42,8 +41,13 @@ include_directories(
 
 add_library(multi_robot_tracking src/hungarian_alg.cpp src/SimpleKalman.cpp  src/track.cpp src/jpdaf_filter.cpp src/phd_filter.cpp src/kalman.cpp src/multi_robot_tracking_nodelet.cpp)
 target_include_directories(multi_robot_tracking PUBLIC include ${catkin_LIBRARIES})
+
 target_link_libraries(multi_robot_tracking PUBLIC ${catkin_LIBRARIES} Eigen3::Eigen)
 add_dependencies(multi_robot_tracking ${catkin_EXPORTED_TARGETS} ${${PROJECT_NAME}_EXPORTED_TARGETS})
+
+add_executable(multi_robot_tracking_node src/multi_robot_tracking_node.cpp)
+add_dependencies(multi_robot_tracking_node ${catkin_EXPORTED_TARGETS}  ${${PROJECT_NAME}_EXPORTED_TARGETS})
+target_link_libraries(multi_robot_tracking_node multi_robot_tracking ${catkin_LIBRARIES})
 
 
 install(
