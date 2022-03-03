@@ -4,16 +4,17 @@
 Track::Track(const float& x, const float& y, const float& vx, const float& vy, TrackerParam params)
 {
 
-    params.R << 2, 0, 0, 2;
-    params.T << 50000, 50000;
-
-    params.P_0 << 20, 0, 0, 0,
-                   0, 20, 0, 0,
-                   0, 0, 8, 0,
-                   0, 0, 0, 8;
-
-    params.principal_point << 489.72, 267.87;
-
+    /*
+    * params.R << 2, 0, 0, 2;
+    * params.T << 50000, 50000;
+    *
+    * params.P_0 << 20, 0, 0, 0,
+    *               0, 20, 0, 0,
+    *               0, 0, 8, 0,
+    *               0, 0, 0, 8;
+    *
+    * params.principal_point << 489.72, 267.87;
+    */
 
     KF = std::shared_ptr<Kalman>(new Kalman(x, y, vx, vy, params));
     life_time = 0;

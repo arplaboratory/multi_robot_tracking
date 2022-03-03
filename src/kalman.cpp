@@ -4,18 +4,18 @@ using namespace std;
 
 Kalman::Kalman(const float& px, const float& py, const float& vx, const float& vy, TrackerParam params)
 {
-
-  params.R << 2, 0, 0, 2;
-  params.T << 100, 100;
-
-  params.P_0 << 10, 0, 0, 0,
-                 0, 20, 0, 0,
-                 0, 0, 10, 0,
-                 0, 0, 0, 20;
-
-  params.principal_point << 180, 120;
-  params.focal_length = 120;
-
+  /*
+  * params.R << 2, 0, 0, 2;
+  * params.T << 100, 100;
+  * 
+  * params.P_0 << 10, 0, 0, 0,
+  *               0, 20, 0, 0,
+  *               0, 0, 10, 0,
+  *               0, 0, 0, 20;
+  * 
+  * params.principal_point << 180, 120;
+  * params.focal_length = 120;
+  */
 
   //CONTROL INPUT model Matrix
   B = Eigen::MatrixXf(4, 3);

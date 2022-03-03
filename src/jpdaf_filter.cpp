@@ -681,4 +681,3 @@ std::vector<int> JpdafFilter::get_nonzero_indexes_row(Eigen::MatrixXf mat)
     }
     return nonzero_elements;
 }
-

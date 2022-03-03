@@ -27,7 +27,7 @@
 #include <iostream>
 #include <fstream>
 
-#define VOXL
+#define HOST
 
 using namespace std;
 
@@ -44,7 +44,9 @@ public:
 
     //callback functions
     void detection_Callback(const geometry_msgs::PoseArray& in_PoseArray); //bbox to track
-    // void image_Callback(const sensor_msgs::ImageConstPtr &img_msg); //rgb raw
+#ifdef HOST    
+    void image_Callback(const sensor_msgs::ImageConstPtr &img_msg); //rgb raw
+#endif
     void imu_Callback(const sensor_msgs::ImuConstPtr &imu_msg); //rgb raw
     void ground_truth_Callback(const geometry_msgs::PoseArray& in_PoseArray); //bbox projection from ground truth
 
@@ -420,7 +422,7 @@ void multi_robot_tracking_Nodelet::image_Callback(const sensor_msgs::ImageConstP
             draw_image();
 
             //remove from img buffer
-            // image_buffer_.erase(image_buffer_.begin() + i);
+            image_buffer_.erase(image_buffer_.begin() + i);
 
             break;
         }
@@ -910,7 +912,21 @@ void multi_robot_tracking_Nodelet::onInit(void)
     priv_nh.param<float>("phd/prune_weight_threshold", phd_prune_weight_threshold, 1e-1);
     priv_nh.param<float>("phd/prune_mahalanobis_threshold_", phd_prune_mahalanobis_dist_threshold, 4.0);
     priv_nh.param<float>("phd/extract_weight_threshold", phd_extract_weight_threshold, 5e-1);
-    
+
+    priv_nh.param<float>("jpdaf/q_pos", q_pos, 6.25);
+    priv_nh.param<float>("jpdaf/q_vel", q_vel, 12.5);
+    priv_nh.param<float>("jpdaf/p_pos_init", p_pos_init, 5.0);
+    priv_nh.param<float>("jpdaf/p_vel_init", p_vel_init, 2.0);
+    priv_nh.param<float>("jpdaf/r_meas", r_meas, 45);
+    priv_nh.param<float>("jpdaf/alpha_0_threshold", jpdaf_filter_.params.alpha_0_threshold); 
+    priv_nh.param<float>("jpdaf/alpha_cam", jpdaf_filter_.params.alpha_cam);
+    priv_nh.param<float>("jpdaf/associaiton_cost", jpdaf_filter_.params.assoc_cost);
+    priv_nh.param<float>("jpdaf/beta_0_threshold", jpdaf_filter_.params.beta_0_threshold);
+    priv_nh.param<float>("jpdaf/false_measurements_density", jpdaf_filter_.params.false_measurements_density);
+    priv_nh.param<float>("jpdaf/gamma", jpdaf_filter_.params.gamma);
+    priv_nh.param<float>("jpdaf/max_missed_rate",jpdaf_filter_.params.max_missed_rate);
+    priv_nh.param<float>("jpdaf/min_acceptance_rate", jpdaf_filter_.params.min_acceptance_rate);
+    priv_nh.param<float>("jpdaf/probability_detection", jpdaf_filter_.params.pd);
 
     ROS_INFO_STREAM("Consensus sort during init " << consensus_sort_complete);
 
@@ -930,11 +946,22 @@ void multi_robot_tracking_Nodelet::onInit(void)
 
     }
 
-    else if (filter_to_use_.compare("jpdaf") == 0) {
+    else if (filter_to_use_.compare("jpdaf") == 0) 
+    {
+        jpdaf_filter_.params.focal_length = f;
+        jpdaf_filter_.params.nb_drones = num_drones;
+        jpdaf_filter_.params.P_0 << p_pos_init, 0, 0, 0,
+                                    0, p_vel_init, 0, 0,
+                                    0, 0, p_pos_init, 0,
+                                    0, 0, 0, p_vel_init;
+        jpdaf_filter_.params.principal_point << cx, cy;
+        jpdaf_filter_.params.R <<   r_meas, 0,
+                                    0, r_meas;
         ROS_WARN("will be using: %s", filter_to_use_.c_str());
     }
 
-    else {
+    else 
+    {
         ROS_ERROR("wrong filter param input");
         return;
     }
