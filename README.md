@@ -51,6 +51,20 @@ Maintainer: Mark Lee, ml7617@nyu.edu<br />**
 |`phd/prune_weight_threshold`|Minimum threshold weight for pruning. If the weight is lower than this value, its removed from the next step|
 |`phd/prune_mahalanobis_threshold`|Maximum mahalanobis distance for merging different updates|
 |`phd/extract_weight_threshold`|Minimum threshold for the weight for state extraction. If the weight is lower than this value, we update the state using the preditction instead of update|
+|`jpdaf/q_pos`|Process noise for the evolution of position|
+|`jpdaf/q_vel`|Process noise for the evolution of velocity|
+|`jpdaf/p_pos_init`|Initial process covariance for position|
+|`jpdaf/p_vel_init`|Initial process covariance for velocity|
+|`jpdaf/r_meas`|Measurement noise|
+|`jpdaf/alpha_0_threshold`|JPDAF Alpha 0 threshold|
+|`jpdaf/alpha_cam`|JPDAF aplha for camera|
+|`jpdaf/associaiton_cost`|Association cost for JPDAF|
+|`jpdaf/beta_0_threshold`|JPDAF beta 0 threshold|
+|`jpdaf/false_measurements_density`|JPDAF false measurement threshold|
+|`jpdaf/gamma`|JPDAF gamma|
+|`jpdaf/max_missed_rate`|JPDAF max missed rate|
+|`jpdaf/min_acceptance_rate`|JPDAF minimim acceptance rate|
+|`jpdaf/probability_detection`|JPDAF probability of detection|
 
 ## Install
 The tracking filter package is dependent on Eigen and Boost, and ROS. The additional repo can be installed below:
