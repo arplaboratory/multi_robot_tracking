@@ -7,9 +7,9 @@ This is ROS package developed for tracking multiple agents using a camera. This 
 ![Screenshot](doc/tracking.png)
 
 
-**Developer: Mark Lee<br />
+**Developer: Mark Lee, Vivek Radhakrishnan<br />
 Affiliation: [NYU ARPL](https://wp.nyu.edu/arpl/)<br />
-Maintainer: Mark Lee, ml7617@nyu.edu<br />**
+Maintainer: Vivek Radhakrishnan, vr2171@nyu.edu<br />**
 
 #### Subscribed Topics
 |Name|Type|Description|
