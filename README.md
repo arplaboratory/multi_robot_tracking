@@ -57,7 +57,7 @@ Maintainer: Vivek Radhakrishnan, vr2171@nyu.edu<br />**
 |`jpdaf/p_vel_init`|Initial process covariance for velocity|
 |`jpdaf/r_meas`|Measurement noise|
 |`jpdaf/alpha_0_threshold`|JPDAF Alpha 0 threshold|
-|`jpdaf/alpha_cam`|JPDAF aplha for camera|
+|`jpdaf/alpha_cam`|pixel size ratio, use 1 for normal images|
 |`jpdaf/associaiton_cost`|Association cost for JPDAF|
 |`jpdaf/beta_0_threshold`|JPDAF beta 0 threshold|
 |`jpdaf/false_measurements_density`|JPDAF false measurement threshold|
