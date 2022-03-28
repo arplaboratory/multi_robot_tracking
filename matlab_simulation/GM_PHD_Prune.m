@@ -174,6 +174,7 @@ end
 
 
 numTargets_J_pruned = size(w_bar_k_fixed,2);%The number of targets after pruning
+numTargets_J_pruned_history = [numTargets_J_pruned_history numTargets_J_pruned];
 
 %Here you could do some check to see if numTargets_J_pruned > maxGaussiansJ
 %and if needed delete some of the weaker gaussians. I haven't bothered but

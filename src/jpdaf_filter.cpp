@@ -5,9 +5,10 @@
 
 #include <multi_robot_tracking/track.h>
 #include <multi_robot_tracking/hungarian_alg.h>
+#include <chrono>
 
 using namespace std;
-
+using namespace std::chrono;
 
 JpdafFilter::JpdafFilter()
 {
@@ -28,7 +29,7 @@ void JpdafFilter::initialize_matrix()
 
 void JpdafFilter::track(bool called_from_detection)
 {
-
+    auto time_start = high_resolution_clock::now();
     startTime = ros::Time::now();
   geometry_msgs::PoseArray latest_pose_detection;
 
@@ -132,11 +133,12 @@ void JpdafFilter::track(bool called_from_detection)
           auto betas_matrix = compute_betas_matrix(hypothesis_mats, hypothesis_probs);
 //            cout << "betas_matrix: " << endl << betas_matrix << endl;
 
-
           std::vector<double> betas_0;
           for(uint t=0; t<tracks_.size(); t++)
           {
+              ROS_INFO("1");
               std::vector<double> beta(betas_matrix.rows());
+              ROS_INFO("2");
               double beta_0 = 1.0;
               for(int m=0; m<betas_matrix.rows(); m++)
               {
@@ -169,7 +171,11 @@ void JpdafFilter::track(bool called_from_detection)
 
           endTime = ros::Time::now();
           float planTime = (endTime - startTime).toSec();
-          ROS_WARN("total track time: %f [sec]", (endTime - startTime).toSec());
+          ROS_ERROR("total track time: %f [sec]", (endTime - startTime).toSec());
+          
+          auto time_end = high_resolution_clock::now();
+          auto duration = duration_cast<std::chrono::microseconds>(time_end - time_start);
+          ROS_ERROR_STREAM("Time taken by function: " << duration.count() << " microseconds" << endl);
 
 //          draw_tracks_publish_image(detections, (double)(last_timestamp_synchronized + time_step), projected_predictions);
 //                   publishTracks((double)(last_timestamp_synchronized + time_step));
@@ -488,6 +494,7 @@ Eigen::MatrixXf JpdafFilter::compute_betas_matrix(std::vector<Eigen::MatrixXf> h
 std::vector<Track> JpdafFilter::create_new_tracks(std::vector<Detection> detections, std::vector<int> unassoc_detections_idx, Eigen::Vector3f omega, double time_step)
 {
     std::vector<Track> new_tracks;
+    int fff = 0;
 
     const uint& prev_unassoc_size = prev_unassoc_detections.size();
     const uint& unassoc_size = unassoc_detections_idx.size();
@@ -522,7 +529,6 @@ std::vector<Track> JpdafFilter::create_new_tracks(std::vector<Detection> detecti
                 costMat(i, j) = costs.at(i + j*prev_unassoc_size);
             }
         }
-
         std::vector<int> assignments;
         AssignmentProblemSolver APS;
         APS.Solve(costs, prev_unassoc_size, unassoc_size, assignments, AssignmentProblemSolver::optimal);
@@ -538,7 +544,6 @@ std::vector<Track> JpdafFilter::create_new_tracks(std::vector<Detection> detecti
               assigmentsBin(i, assignments[i]) = 1;
             }
         }
-
         for(uint i = 0; i < prev_unassoc_size; ++i)
         {
             for(uint j = 0; j < unassoc_size; ++j)
@@ -549,7 +554,6 @@ std::vector<Track> JpdafFilter::create_new_tracks(std::vector<Detection> detecti
                     B = Eigen::MatrixXf(2, 3);
                     B << 0, 0, 0,
                          0, 0, 0;
-
                     B(0,0) = ((unassoc_detections.at(j).x()-params.principal_point(0))*(unassoc_detections.at(j).y()-params.principal_point(1)))/params.focal_length;
                     B(0,1) = -(params.focal_length*params.alpha_cam + (unassoc_detections.at(j).x()-params.principal_point(0))*(unassoc_detections.at(j).x()-params.principal_point(0))/(params.focal_length*params.alpha_cam));
                     B(0,2) = params.alpha_cam*(unassoc_detections.at(j).y()-params.principal_point(1));
@@ -562,13 +566,13 @@ std::vector<Track> JpdafFilter::create_new_tracks(std::vector<Detection> detecti
 
                     const float& vx = (unassoc_detections.at(j).x()-prev_unassoc_detections.at(i).x())/time_step - speed_offset(0);
                     const float& vy = (unassoc_detections.at(j).y()-prev_unassoc_detections.at(i).y())/time_step - speed_offset(1);
+
                     Track tr(unassoc_detections.at(j).x(), unassoc_detections.at(j).y(), vx, vy, params);
                     new_tracks.push_back(tr);
                     ROS_INFO("created new track with position %f %f, speed %f %f", unassoc_detections.at(j).x(), unassoc_detections.at(j).y(), vx, vy);
                 }
             }
         }
-
         Eigen::MatrixXf sumAssoc(1, unassoc_size);
         sumAssoc.setZero();
         for(uint i = 0; i < prev_unassoc_size; ++i)
@@ -606,7 +610,9 @@ void JpdafFilter::manage_new_old_tracks(std::vector<Detection> detections, std::
         }
     }
 
+    ROS_ERROR_STREAM("TEST !!");
     auto new_tracks = create_new_tracks(detections, unassoc_detections_idx, omega, time_step);
+    ROS_ERROR_STREAM("TEST !!!!!!");
 
     for(uint j=0; j<betas_0.size(); j++)
     {
@@ -675,4 +681,3 @@ std::vector<int> JpdafFilter::get_nonzero_indexes_row(Eigen::MatrixXf mat)
     }
     return nonzero_elements;
 }
-

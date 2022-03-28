@@ -8,10 +8,10 @@
 
 if(USE_REAL_DATA)
     %% Read Rosbag and fill in PX, PY
-    real_bag = rosbag("/home/marklee/rosbag/maxim_glass_tracking.bag");
-    bbox_bag = select(real_bag, 'Topic', "/darknet_ros/bounding_boxes");
-    glass_bag = select(real_bag, 'Topic', "/vicon/TobiiGlasses/odom");
-    drone1_bag = select(real_bag, 'Topic', "/vicon/DragonFly1/odom");
+    real_bag = rosbag("drone_2d_3drones_imu.bag");
+    bbox_bag = select(real_bag, 'Topic', "/hummingbird0/camera/bounding_box");
+    glass_bag = select(real_bag, 'Topic', "/hummingbird0/imu");
+    drone1_bag = select(real_bag, 'Topic', "/hummingbird0/track/bounding_box");
     
     
     %get bbox topic
@@ -90,6 +90,8 @@ temp = [];
 %than this.
 MAX_V = 30;
 
+numTargets_J_pruned_history = [];
+numTargets_Jk_k_minus_1_history = [];
 
 %% Utility functions
 calculateDataRange2 = @(j) (2*j-1):(2*j);%Used to calculate the indices of two-dimensional target j in a long list of two-dimensional targets

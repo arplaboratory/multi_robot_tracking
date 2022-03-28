@@ -9,10 +9,6 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/Imu.h>
 
-//detection bbox
-//#include <darknet_ros_msgs/BoundingBoxes.h>
-//#include <darknet_ros_msgs/BoundingBox.h>
-
 //CV
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
@@ -25,33 +21,31 @@
 #define PI 3.14159
 //#define NUM_DRONES 3
 
-class PhdFilter
+class KalmanFilter
 {
  public:
-  PhdFilter();
+  KalmanFilter();
 
-  void initialize_matrix(float cam_cu, float cam_cv, float cam_f, float meas_dt=0.225);
+  void initializeMatrix(float cam_cu, float cam_cv, float cam_f, float meas_dt=0.225);
   void initialize(float q_pos, float q_vel, float r_meas, float p_pos_init, float p_vel_init,
                 float prune_weight_threshold, float prune_mahalanobis_threshold, float extract_weight_threshold);
-  void phd_track();
-  void phd_predict_existing();
-  void phd_construct();
-  void phd_update();
-  void phd_prune();
-  void phd_state_extract();
-  void asynchronous_predict_existing();
-  void removeColumn(Eigen::MatrixXd& matrix, unsigned int colToRemove);
-  void removeColumnf(Eigen::MatrixXf& matrix, unsigned int colToRemove);
-  void removeColumni(Eigen::MatrixXi& matrix, unsigned int colToRemove);
+  void kalmanTrack();
+  void kalmanPredict();
+  void kalmanUpdate();
+  void kalmanExtract();
+  void associateMeasurement();
+  void addIssues(int issue, float val);
+  
+  void setNumDrones(int num_drones);
+  void updateA(float input_dt);
 
-  void set_num_drones(int num_drones);
-  float clutter_intensity(const float X, const float Y);
-  Eigen::MatrixXf left_divide(const Eigen::MatrixXf);
-  void update_F_matrix(float input_dt);
-  void update_A_matrix(float input_dt);
+  void writeToFile();
+
+  void removeRow(Eigen::MatrixXf& matrix, unsigned int rowToRemove);
+  void removeColumn(Eigen::MatrixXf& matrix, unsigned int rowToRemove);
 
 
-  ros::Time startTime,endTime,processTime;
+  ros::Time startTime, endTime, processTime;
 
   geometry_msgs::PoseArray Z_current_k;
   int NUM_DRONES;
@@ -60,14 +54,9 @@ class PhdFilter
   float last_timestamp_synchronized;
   double last_timestamp_from_rostime;
   bool first_callback = true;
-  int numTargets_Jk_k_minus_1;
-  int numTargets_Jk_minus_1;
-  int L = 0;
 
   int k_iteration = 0;
-  bool flag_asynch_start = false;
-  bool enable_async = true;
-
+  int removed_columns = 0;
 
   //kalman filter variables
   Eigen::MatrixXf F;
@@ -78,9 +67,6 @@ class PhdFilter
   Eigen::MatrixXf K;
 
   //phd variables
-
-  float prob_survival = 1.0;
-  float prob_detection = 0.9;//1.0;
 
   float dt_cam = 0.125; //8hz
   float dt_imu = 0.01;  //100hz
@@ -98,16 +84,6 @@ class PhdFilter
   Eigen::MatrixXf mk;
   Eigen::MatrixXf wk;
   Eigen::MatrixXf Pk;
-
-  Eigen::MatrixXf mk_bar;
-  Eigen::MatrixXf wk_bar;
-  Eigen::MatrixXf Pk_bar;
-
-  Eigen::MatrixXf mk_bar_fixed;
-  Eigen::MatrixXf wk_bar_fixed;
-  Eigen::MatrixXf Pk_bar_fixed;
-
-  Eigen::MatrixXf mk_k_minus_1_beforePrediction;
 
   Eigen::MatrixXf Z_k;
   Eigen::MatrixXf Z_k_previous;
@@ -128,6 +104,11 @@ class PhdFilter
   const uint8_t n_state = 4;
   const uint8_t n_meas = 2;
   const uint8_t n_input = 3;
+
+  uint8_t num_measurements_current;
+  Eigen::MatrixXf::Index max_indices[100];
+
+  std::ofstream output_file;
 
  private:
 

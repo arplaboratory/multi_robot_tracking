@@ -1,0 +1,54 @@
+input_bbox_topic: "/hummingbird0/track/bounding_box"
+input_img_topic: "/hummingbird0/camera/rgb"
+input_imu_topic: "/hummingbird0/imu"
+
+init_pos_self_x: 0.0
+init_pos_self_y: 0.0
+init_pos_x_left: 3.4641
+init_pos_y_left: 2.0
+init_pos_x_right: 3.4641
+init_pos_y_right: -2.0
+id_self: 0
+id_left: 1
+id_right: 2
+  
+camera_cx: 180
+camera_cy: 120
+camera_f: 120
+
+dt: 0.225
+  
+viz_detection_height: 240
+viz_detection_width: 320
+viz_detection_offset_x: 0
+viz_detection_offset_y: 0
+
+enable_async_pdf: true
+
+use_generated_id: true
+
+phd: 
+  q_pos: 6.25
+  q_vel: 12.5
+  r_meas: 10
+  p_pos_init: 5.0
+  p_vel_init: 10.0
+  prune_weight_threshold: 0.1
+  prune_mahalanobis_threshold: 4.0
+  extract_weight_threshold: 0.5
+
+jpdaf:
+  q_pos: 100.0
+  q_vel: 100.0
+  p_pos_init: 10.0
+  p_vel_init: 20.0
+  r_meas: 2.0
+  alpha_0_threshold: 0.95
+  alpha_cam: 1.0
+  associaiton_cost: 50.0
+  beta_0_threshold: 0.5
+  false_measurements_density: 0.00000003034
+  gamma: 10.0
+  max_missed_rate: 15
+  min_acceptance_rate: 15
+  probability_detection: 0.952662721893
