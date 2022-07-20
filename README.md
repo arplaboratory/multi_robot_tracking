@@ -1,6 +1,23 @@
 # Multi Agent Tracking 
 Multi Agent Tracking for Data Association with various filter comparison
 
+## License
+Please be aware that this code was originally implemented for research purposes and may be subject to changes and any fitness for a particular purpose is disclaimed. To inquire about commercial licenses, please contact Prof. Giuseppe Loianno (loiannog@nyu.edu).
+```
+
+    
+```
+## Citation
+If you publish a paper with our simulator, please cite our paper: 
+```
+@article{VisualTraIROS2022,
+  url = {https://arxiv.org/abs/2207.08301},
+  Year = {2022},
+  Booktitle = {IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)}
+  author = {Ge, Rundong and Lee, Moonyoung and Radhakrishnan, Vivek and Zhou, Yang and Li, Guanrui and Loianno, Giuseppe},
+  title = {Vision-based Relative Detection and Tracking for Teams of Micro Aerial Vehicles}}
+ ```
+
 ## Overview
 This is ROS package developed for tracking multiple agents using a camera. This software is designed for associating 2D bounding box measurements (of drones) to unique IDs and 2D position in image space. The required inputs for this software are 2d bounding box measurements and RGB image. The provided outputs are 2D positions with target associations. The motion model is based on Gaussian Linear kalman filter with probabilistic hypothesis density (PHD) filter to solve association. Can also run Joint Probability Association filter (JPDAF) by switching rosparam upon launch. This repository includes matlab implementation and evaluation as well.    
 
