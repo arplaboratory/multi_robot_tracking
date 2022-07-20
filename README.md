@@ -8,7 +8,7 @@ Please be aware that this code was originally implemented for research purposes 
     
 ```
 ## Citation
-If you publish a paper with our simulator, please cite our paper: 
+If you publish a paper with this work, please cite our paper: 
 ```
 @article{VisualTraIROS2022,
   url = {https://arxiv.org/abs/2207.08301},
