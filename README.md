@@ -21,12 +21,12 @@ Please be aware that this code was originally implemented for research purposes 
 ## Citation
 If you publish a paper with this work, please cite our paper: 
 ```
-@article{CrocettiMaoICRA2023,
-  url = {https://arxiv.org/abs/2303.08181},
-  Year = {2023},
-  Booktitle = {IEEE International Conference on Robotics and Automation (ICRA)}
-  author = {Crocetti, Francesco and Mao, Jeffrey and Saviolo, Alessandro and Costante, Gabriele and Loianno, Giuseppe},
-  title = {GaPT: Gaussian Process Toolkit for Online Regression with Application to Learning Quadrotor Dynamics}}
+@article{VisualTraIROS2022,
+  url = {https://arxiv.org/abs/2207.08301},
+  Year = {2022},
+  Booktitle = {IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)}
+  author = {Ge, Rundong and Lee, Moonyoung and Radhakrishnan, Vivek and Zhou, Yang and Li, Guanrui and Loianno, Giuseppe},
+  title = {Vision-based Relative Detection and Tracking for Teams of Micro Aerial Vehicles}}
  ```
 
 ## Overview
