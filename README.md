@@ -26,7 +26,7 @@ If you publish a paper with this work, please cite our paper:
   Year = {2023},
   Booktitle = {IEEE International Conference on Robotics and Automation (ICRA)}
   author = {Crocetti, Francesco and Mao, Jeffrey and Saviolo, Alessandro and Costante, Gabriele and Loianno, Giuseppe},
-  title = {[PDF] from arxiv.org GaPT: Gaussian Process Toolkit for Online Regression with Application to Learning Quadrotor Dynamics}}
+  title = {GaPT: Gaussian Process Toolkit for Online Regression with Application to Learning Quadrotor Dynamics}}
  ```
 
 ## Overview
